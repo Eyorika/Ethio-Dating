@@ -33,11 +33,15 @@ async function showNextProfile(ctx: Scenes.SceneContext) {
     const swipedList = swipedIds?.map(s => s.swiped_id) || [];
     if (userId) swipedList.push(userId as any);
 
+    // Filter out session-skipped IDs
+    const skippedIds = (ctx.session as any).skippedIds || [];
+    const excludeList = [...swipedList, ...skippedIds];
+
     let query = supabase
         .from('profiles')
         .select('*')
         .neq('id', userId)
-        .filter('id', 'not.in', `(${swipedList.join(',')})`)
+        .filter('id', 'not.in', `(${excludeList.join(',')})`)
         .eq('is_active', true)
         .eq('is_verified', true);
 
@@ -49,38 +53,95 @@ async function showNextProfile(ctx: Scenes.SceneContext) {
 
     if (error || !profiles || profiles.length === 0) {
         await ctx.replyWithMarkdown(PROMPTS.SYSTEM.NO_MORE_SWIPES);
+        // Clear skipped IDs so they can see them again next session?
+        // Or keep them excluded until they restart bot? 
+        // Let's clear them on "no more swipes" to allow cycling if they want?
+        // Actually, user probably wants "Next" to mean "Not now", so maybe keep them excluded for this session.
+        // If we want to cycle, user can just restart the scene.
         return ctx.scene.leave();
     }
 
     const target = profiles[0];
     const caption = `🔥 **${target.first_name}**, ${target.age}\n📍 ${target.sub_city || target.city}\n⛪️ ${target.religion || 'No religion specified'}\n\n"${target.bio || 'No bio yet'}"`;
 
+    const buttons = [
+        [
+            Markup.button.callback('❌ Pass', `swipe_dislike_${target.id}`),
+            Markup.button.callback('❤️ Like', `swipe_like_${target.id}`)
+        ]
+    ];
+
+    const extraButtons = [];
+    if (target.voice_intro_url) {
+        extraButtons.push(Markup.button.callback('🎤 Voice Intro', `play_voice_${target.id}`));
+    }
+    extraButtons.push(Markup.button.callback('Next ⏭️', `next_profile_${target.id}`));
+
+    // Add extra buttons row if any
+    if (extraButtons.length > 0) {
+        buttons.push(extraButtons);
+    }
+
+    buttons.push([Markup.button.callback('🚩 Report User', `report_user_${target.id}`)]);
+
     try {
+        console.log(`[Discovery] Attempting to send photo for ${target.first_name} (${target.id})`);
         await ctx.replyWithPhoto(target.photo_urls[0], {
             caption,
             parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [
-                    Markup.button.callback('❌ Pass', `swipe_dislike_${target.id}`),
-                    Markup.button.callback('❤️ Like', `swipe_like_${target.id}`)
-                ],
-                [Markup.button.callback('🚩 Report User', `report_user_${target.id}`)]
-            ])
+            ...Markup.inlineKeyboard(buttons)
         });
+        console.log(`[Discovery] Photo sent successfully.`);
     } catch (e) {
-        console.error("Discovery photo failed to send:", e);
-        await ctx.reply(`🔥 **${target.first_name}**, ${target.age} (Photo missing)\n📍 ${target.sub_city || target.city}\n\n"${target.bio || 'No bio'}"`, {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [
-                    Markup.button.callback('❌ Pass', `swipe_dislike_${target.id}`),
-                    Markup.button.callback('❤️ Like', `swipe_like_${target.id}`)
-                ],
-                [Markup.button.callback('🚩 Report User', `report_user_${target.id}`)]
-            ])
-        });
+        console.error(`[Discovery] Failed to send photo for ${target.id}. Error:`, e);
+        try {
+            await ctx.reply(`🔥 **${target.first_name}**, ${target.age} (Photo missing)\n📍 ${target.sub_city || target.city}\n\n"${target.bio || 'No bio'}"`, {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard(buttons)
+            });
+        } catch (innerError) {
+            console.error("[Discovery] Fallback message also failed!", innerError);
+            // Last resort: simple text without markdown
+            await ctx.reply(`🔥 ${target.first_name}, ${target.age} (Photo missing)\n"${target.bio || 'No bio'}"` + "\n\n(Note: Some profile details could not be displayed due to formatting errors.)",
+                Markup.inlineKeyboard(buttons)
+            );
+        }
     }
 }
+
+// Handle Voice Intro Playback
+discoveryScene.action(/play_voice_(.+)/, async (ctx) => {
+    const targetId = ctx.match[1];
+    const { data: profile } = await supabase.from('profiles').select('voice_intro_url').eq('id', targetId).single();
+
+    if (profile?.voice_intro_url) {
+        try {
+            await ctx.replyWithVoice(profile.voice_intro_url);
+        } catch (e) {
+            console.error("Failed to send voice:", e);
+            await ctx.answerCbQuery("Aiyee! The voice note seems to be broken. 😔", { show_alert: true });
+        }
+    } else {
+        await ctx.answerCbQuery("Oops! No voice intro found.", { show_alert: true });
+    }
+    try { await ctx.answerCbQuery(); } catch (e) { }
+});
+
+// Handle Next (Skip)
+discoveryScene.action(/next_profile_(.+)/, async (ctx) => {
+    const targetId = ctx.match[1];
+    if (!targetId) return;
+
+    // Add to specific session skippedIds
+    if (!(ctx.session as any).skippedIds) {
+        (ctx.session as any).skippedIds = [];
+    }
+    (ctx.session as any).skippedIds.push(targetId);
+
+    try { await ctx.answerCbQuery(); } catch (e) { }
+    try { await ctx.deleteMessage(); } catch (e) { } // Clean up old profile
+    return showNextProfile(ctx);
+});
 
 // Handle Swipes
 discoveryScene.action(/swipe_(like|dislike)_(.+)/, async (ctx) => {

@@ -14,7 +14,7 @@ import { registrationWizard } from './scenes/registration.js';
 import { discoveryScene } from './scenes/discovery.js';
 import { profileScene } from './scenes/profile.js';
 import { adminScene } from './scenes/admin.js';
-import { editBioWizard, editPhotosWizard, editInterestWizard, editLocationWizard, editZodiacWizard, editNameWizard, editAgeWizard, editLanguageWizard } from './scenes/editProfile.js';
+import { editBioWizard, editPhotosWizard, editInterestWizard, editLocationWizard, editZodiacWizard, editNameWizard, editAgeWizard, editLanguageWizard, editVoiceWizard } from './scenes/editProfile.js';
 import { likersScene } from './scenes/likers.js';
 import { matchesScene } from './scenes/matches.js';
 import { zodiacDiscoveryScene } from './scenes/zodiacDiscovery.js';
@@ -35,6 +35,7 @@ const stage = new Scenes.Stage<Scenes.SceneContext>([
     editNameWizard as any,
     editAgeWizard as any,
     editLanguageWizard as any,
+    editVoiceWizard as any,
     likersScene as any,
     matchesScene as any,
     zodiacDiscoveryScene as any

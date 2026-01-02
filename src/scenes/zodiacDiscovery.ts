@@ -44,12 +44,16 @@ async function showNextZodiacProfile(ctx: Scenes.SceneContext, userProfile: any,
     const swipedList = swipedIds?.map(s => s.swiped_id) || [];
     if (userId) swipedList.push(userId as any);
 
+    // Filter out session-skipped IDs
+    const skippedIds = (ctx.session as any).skippedIds || [];
+    const excludeList = [...swipedList, ...skippedIds];
+
     let query = supabase
         .from('profiles')
         .select('*')
         .neq('id', userId)
         .in('zodiac', compatibleZodiacs)
-        .filter('id', 'not.in', `(${swipedList.join(',')})`)
+        .filter('id', 'not.in', `(${excludeList.join(',')})`)
         .eq('is_active', true)
         .eq('is_verified', true);
 
@@ -74,18 +78,84 @@ async function showNextZodiacProfile(ctx: Scenes.SceneContext, userProfile: any,
         `**Bio:** ${target.bio || 'No bio'}\n\n` +
         `The stars say you're a great match! ❤️`;
 
-    await ctx.replyWithPhoto(target.photo_urls[0], {
-        caption,
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [
-                Markup.button.callback('❌ Pass', `zodiac_dislike_${target.id}`),
-                Markup.button.callback('❤️ Like!', `zodiac_like_${target.id}`)
-            ],
-            [Markup.button.callback('🏠 Back to Menu', 'back_to_menu')]
-        ])
-    });
+    const buttons = [
+        [
+            Markup.button.callback('❌ Pass', `zodiac_dislike_${target.id}`),
+            Markup.button.callback('❤️ Like!', `zodiac_like_${target.id}`)
+        ]
+    ];
+
+    const extraButtons = [];
+    if (target.voice_intro_url) {
+        extraButtons.push(Markup.button.callback('🎤 Voice Intro', `play_zodiac_voice_${target.id}`));
+    }
+    extraButtons.push(Markup.button.callback('Next ⏭️', `next_zodiac_profile_${target.id}`));
+
+    if (extraButtons.length > 0) {
+        buttons.push(extraButtons);
+    }
+
+    buttons.push([Markup.button.callback('🏠 Back to Menu', 'back_to_menu')]);
+
+    try {
+        await ctx.replyWithPhoto(target.photo_urls[0], {
+            caption,
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard(buttons)
+        });
+    } catch (e) {
+        console.error("Zodiac photo failed to send:", e);
+        await ctx.reply(`⭐ **Zodiac Match!** ⭐\n\n` +
+            `**${target.first_name}** (${target.age}) (Photo missing)\n` +
+            `**Zodiac:** ${targetZodiac?.icon} ${target.zodiac}\n` +
+            `**Location:** ${target.sub_city || target.city}\n` +
+            `**Bio:** ${target.bio || 'No bio'}\n\n` +
+            `The stars say you're a great match! ❤️`, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard(buttons)
+        });
+    }
 }
+
+// Handle Voice Intro
+zodiacDiscoveryScene.action(/play_zodiac_voice_(.+)/, async (ctx) => {
+    const targetId = ctx.match[1];
+    const { data: profile } = await supabase.from('profiles').select('voice_intro_url').eq('id', targetId).single();
+
+    if (profile?.voice_intro_url) {
+        try {
+            await ctx.replyWithVoice(profile.voice_intro_url);
+        } catch (e) {
+            console.error("Failed to send voice:", e);
+            await ctx.answerCbQuery("Aiyee! The voice note seems to be broken. 😔", { show_alert: true });
+        }
+    } else {
+        await ctx.answerCbQuery("Oops! No voice intro found.", { show_alert: true });
+    }
+    try { await ctx.answerCbQuery(); } catch (e) { }
+});
+
+// Handle Next (Skip)
+zodiacDiscoveryScene.action(/next_zodiac_profile_(.+)/, async (ctx) => {
+    const targetId = ctx.match[1];
+    if (!targetId) return;
+
+    // Add to specific session skippedIds
+    if (!(ctx.session as any).skippedIds) {
+        (ctx.session as any).skippedIds = [];
+    }
+    (ctx.session as any).skippedIds.push(targetId);
+
+    try { await ctx.answerCbQuery(); } catch (e) { }
+    try { await ctx.deleteMessage(); } catch (e) { }
+
+    // We need to re-fetch user profile to call showNextZodiacProfile... or we can store it in session?
+    // Optimization: Just fetch it again for now.
+    const userId = ctx.from?.id;
+    const { data: userProfile } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    const compatibleZodiacs = ZODIAC_COMPATIBILITY[userProfile.zodiac] || [];
+    return showNextZodiacProfile(ctx, userProfile, compatibleZodiacs);
+});
 
 zodiacDiscoveryScene.action(/zodiac_(like|dislike)_(.+)/, async (ctx) => {
     const [, type, targetId] = ctx.match;

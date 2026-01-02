@@ -341,3 +341,48 @@ export const editLanguageWizard = new Scenes.WizardScene(
         return ctx.scene.enter('PROFILE_SCENE');
     }
 );
+
+// Edit Voice Wizard
+export const editVoiceWizard = new Scenes.WizardScene(
+    'EDIT_VOICE_WIZARD',
+    async (ctx) => {
+        const { data: profile } = await supabase.from('profiles').select('language').eq('id', ctx.from?.id).single();
+        const lang = profile?.language || 'en';
+        (ctx.wizard.state as any).language = lang;
+
+        const prompt = lang === 'am'
+            ? "ድምጽህን/ሽን ለመቀየር ዝግጁ ነህ/ሽ? 🎤 አዲስ የድምጽ መልእክት (Voice Message) ይላኩ። \n\nከተጸጸትክ/ሽ '🔙 Back' ወይም '🔙 ተመለስ' የሚለውን ንካ።"
+            : "Ready to update your intro? 🎤 Record a new 'Tebesa Intro' (Voice Message). \n\nOr click '🔙 Back' if you changed your mind.";
+
+        await ctx.reply(prompt, Markup.keyboard([
+            [lang === 'am' ? '🔙 ተመለስ' : '🔙 Back']
+        ]).resize());
+        return ctx.wizard.next();
+    },
+    async (ctx) => {
+        const lang = (ctx.wizard.state as any).language;
+
+        if ((ctx.message as any).voice) {
+            const voiceId = (ctx.message as any).voice.file_id;
+
+            const { error } = await supabase
+                .from('profiles')
+                .update({ voice_intro_url: voiceId })
+                .eq('id', ctx.from?.id);
+
+            if (error) {
+                await ctx.reply(lang === 'am' ? "Aiyee! ድምጽህን/ሽን ማስተካከል አልቻልኩም።" : "Aiyee! Failed to update your voice intro.");
+            } else {
+                await ctx.reply(lang === 'am' ? "ድምጽህ/ሽ ተስተካክሏል! 🎤" : "Voice intro updated! 🎤", Markup.removeKeyboard());
+            }
+            return ctx.scene.enter('PROFILE_SCENE');
+
+        } else if ((ctx.message as any).text === '🔙 Back' || (ctx.message as any).text === '🔙 ተመለስ') {
+            await ctx.reply(lang === 'am' ? "ምንም አልተቀየረም!" : "No changes made!", Markup.removeKeyboard());
+            return ctx.scene.enter('PROFILE_SCENE');
+        } else {
+            await ctx.reply(lang === 'am' ? "እባክህ/ሽ ድምጽ ብቻ ላክ! (Voice Message)" : "Please send a voice message only!");
+            return;
+        }
+    }
+);

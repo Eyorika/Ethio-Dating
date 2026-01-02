@@ -38,20 +38,46 @@ profileScene.enter(async (ctx) => {
         `**Status:** ${status}\n\n` +
         `❤️ **Likes Received:** ${likesCount?.length || 0}`;
 
-    await ctx.replyWithPhoto(profile.photo_urls[0], {
-        caption,
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [Markup.button.callback('❤️ See Who Liked You', 'view_likers')],
-            [Markup.button.callback('✏️ Name', 'edit_name'), Markup.button.callback('🎂 Age', 'edit_age')],
-            [Markup.button.callback('✏️ Bio', 'edit_bio'), Markup.button.callback('⭐ Zodiac', 'edit_zodiac')],
-            [Markup.button.callback('🎯 Edit Interest', 'edit_interest')],
-            [Markup.button.callback('📍 Edit Location', 'edit_location')],
-            [Markup.button.callback('🖼️ Change Photos', 'edit_photos')],
-            [Markup.button.callback('🌐 Language', 'edit_language')],
-            [Markup.button.callback('🏠 Back to Menu', 'back_to_menu')]
-        ])
-    });
+    const buttons = [
+        [Markup.button.callback('❤️ See Who Liked You', 'view_likers')],
+        [Markup.button.callback('✏️ Name', 'edit_name'), Markup.button.callback('🎂 Age', 'edit_age')],
+        [Markup.button.callback('✏️ Bio', 'edit_bio'), Markup.button.callback('⭐ Zodiac', 'edit_zodiac')],
+        [Markup.button.callback('🎯 Edit Interest', 'edit_interest')],
+        [Markup.button.callback('📍 Edit Location', 'edit_location')],
+        [Markup.button.callback('🖼️ Change Photos', 'edit_photos')],
+        [Markup.button.callback('🌐 Language', 'edit_language')]
+    ];
+
+    if (profile.voice_intro_url) {
+        buttons.push([Markup.button.callback('🎤 Hear My Voice', 'play_my_voice'), Markup.button.callback('🎤 Edit Voice Intro', 'edit_voice')]);
+    } else {
+        buttons.push([Markup.button.callback('🎤 Add Voice Intro', 'edit_voice')]);
+    }
+
+    buttons.push([Markup.button.callback('🏠 Back to Menu', 'back_to_menu')]);
+
+    try {
+        await ctx.replyWithPhoto(profile.photo_urls[0], {
+            caption,
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard(buttons)
+        });
+    } catch (e) {
+        console.error("Profile photo failed to send:", e);
+        // Fallback to text
+        await ctx.reply(`👤 **Your Profile**\n(Photo missing)\n\n` +
+            `**Name:** ${profile.first_name}\n` +
+            `**Age:** ${profile.age}\n` +
+            `**Location:** ${profile.sub_city || profile.city}\n` +
+            `**Bio:** ${profile.bio || 'None'}\n` +
+            `**Zodiac:** ${zodiacText} 🌟\n` +
+            `**Interested In:** ${profile.interested_in}\n` +
+            `**Status:** ${status}\n\n` +
+            `❤️ **Likes Received:** ${likesCount?.length || 0}`, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard(buttons)
+        });
+    }
 });
 
 profileScene.action('edit_language', (ctx) => ctx.scene.enter('EDIT_LANGUAGE_WIZARD'));
@@ -63,6 +89,22 @@ profileScene.action('edit_photos', (ctx) => ctx.scene.enter('EDIT_PHOTOS_WIZARD'
 profileScene.action('edit_interest', (ctx) => ctx.scene.enter('EDIT_INTEREST_WIZARD'));
 profileScene.action('edit_zodiac', (ctx) => ctx.scene.enter('EDIT_ZODIAC_WIZARD'));
 profileScene.action('edit_location', (ctx) => ctx.scene.enter('EDIT_LOCATION_WIZARD'));
+profileScene.action('edit_voice', (ctx) => ctx.scene.enter('EDIT_VOICE_WIZARD'));
+
+profileScene.action('play_my_voice', async (ctx) => {
+    const userId = ctx.from?.id;
+    const { data: profile } = await supabase.from('profiles').select('voice_intro_url').eq('id', userId).single();
+    if (profile?.voice_intro_url) {
+        try {
+            await ctx.replyWithVoice(profile.voice_intro_url);
+        } catch (e) {
+            await ctx.answerCbQuery("Aiyee! Your voice intro is not working. Try recording a new one!", { show_alert: true });
+        }
+    } else {
+        await ctx.answerCbQuery("No voice intro found!");
+    }
+    try { await ctx.answerCbQuery(); } catch (e) { }
+});
 
 profileScene.action('view_likers', (ctx) => ctx.scene.enter('LIKERS_SCENE'));
 profileScene.action('back_to_menu', async (ctx) => {
