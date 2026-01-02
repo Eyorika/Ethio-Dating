@@ -52,12 +52,15 @@ async function showNextProfile(ctx: Scenes.SceneContext) {
     const { data: profiles, error } = await query.limit(1);
 
     if (error || !profiles || profiles.length === 0) {
+        // Check if we have skipped profiles to loop back to
+        const session = ctx.session as any;
+        if (session.skippedIds && session.skippedIds.length > 0) {
+            await ctx.reply("Reached the end! 🔄 Looping back to profiles you skipped...");
+            session.skippedIds = []; // Reset skipped IDs
+            return showNextProfile(ctx); // Retry fetch
+        }
+
         await ctx.replyWithMarkdown(PROMPTS.SYSTEM.NO_MORE_SWIPES);
-        // Clear skipped IDs so they can see them again next session?
-        // Or keep them excluded until they restart bot? 
-        // Let's clear them on "no more swipes" to allow cycling if they want?
-        // Actually, user probably wants "Next" to mean "Not now", so maybe keep them excluded for this session.
-        // If we want to cycle, user can just restart the scene.
         return ctx.scene.leave();
     }
 

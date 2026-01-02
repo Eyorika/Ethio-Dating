@@ -64,6 +64,14 @@ async function showNextZodiacProfile(ctx: Scenes.SceneContext, userProfile: any,
     const { data: profiles, error } = await query.limit(1);
 
     if (error || !profiles || profiles.length === 0) {
+        // Check if we have skipped profiles to loop back to
+        const session = ctx.session as any;
+        if (session.skippedIds && session.skippedIds.length > 0) {
+            await ctx.reply("Reached the end of the stars! 🔄 Looping back to compatible matches you skipped...");
+            session.skippedIds = []; // Reset
+            return showNextZodiacProfile(ctx, userProfile, compatibleZodiacs);
+        }
+
         await ctx.reply("I couldn't find any more compatible stars for now. 🌌 Try standard Discovery or check back later!");
         return ctx.scene.leave();
     }

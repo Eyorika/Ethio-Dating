@@ -245,6 +245,23 @@ export const registrationWizard = new Scenes.WizardScene(
                 await ctx.reply(`Aiyee! Something went wrong saving your profile. Error: ${error.message}. Try /register again.`, Markup.removeKeyboard());
             } else {
                 await ctx.reply("Done! You are officially an Arada Member. ✅ \n\nI'll let you know once an admin verifies your photo. In the meantime, type /discovery to see who's out there!", Markup.removeKeyboard());
+
+                // Notify Admin
+                const adminId = process.env.ADMIN_ID;
+                if (adminId) {
+                    try {
+                        await ctx.telegram.sendMessage(adminId,
+                            `🔔 **New User Pending Verification!**\n\n` +
+                            `**Name:** ${data.name}\n` +
+                            `**Age:** ${data.age}\n` +
+                            `**ID:** \`${ctx.from?.id}\`\n\n` +
+                            `Go to /admin -> Pending Verifications to approve.`,
+                            { parse_mode: 'Markdown' }
+                        );
+                    } catch (e) {
+                        console.error("Failed to notify admin:", e);
+                    }
+                }
             }
             return ctx.scene.leave();
         } else {
