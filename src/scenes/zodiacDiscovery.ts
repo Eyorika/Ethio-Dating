@@ -1,6 +1,6 @@
 import { Scenes, Markup } from 'telegraf';
 import { supabase } from '../services/supabase.js';
-import { ZODIACS, ZODIAC_COMPATIBILITY, PROMPTS } from '../content/prompts.js';
+import { ZODIACS, ZODIAC_COMPATIBILITY, PROMPTS, t } from '../content/prompts.js';
 
 export const zodiacDiscoveryScene = new Scenes.BaseScene<Scenes.SceneContext>('ZODIAC_DISCOVERY_SCENE');
 
@@ -14,20 +14,27 @@ zodiacDiscoveryScene.enter(async (ctx) => {
         .eq('id', userId)
         .single();
 
+    const lang = userProfile.language || 'en';
+
     if (!userProfile) {
         await ctx.reply("I couldn't find your profile. Please /register first!");
         return ctx.scene.leave();
     }
 
     if (!userProfile.zodiac) {
-        await ctx.reply("You haven't set your zodiac yet! Go to 'My Profile' -> 'Zodiac' to set it first. ✨");
+        await ctx.reply(lang === 'am'
+            ? "ኮከብህን/ሽን እስካሁን አልመረጥክም! ወደ 'ፕሮፋይሌ' -> 'ኮከብ' በመሄድ መጀመሪያ ምረጥ/ጪ። ✨"
+            : "You haven't set your zodiac yet! Go to 'My Profile' -> 'Zodiac' to set it first. ✨");
         return ctx.scene.leave();
     }
 
     const compatibleZodiacs = ZODIAC_COMPATIBILITY[userProfile.zodiac] || [];
     const zodiacData = ZODIACS.find(z => z.name === userProfile.zodiac);
 
-    await ctx.reply(`🌟 **Zodiac Mode Active!** 🌟\n\nYou are a **${zodiacData?.icon} ${userProfile.zodiac}**. I'm looking for your most compatible stars: ${compatibleZodiacs.join(', ')}...`, { parse_mode: 'Markdown' });
+    await ctx.reply(lang === 'am'
+        ? `🌟 **የኮከብ ተኳሽ ዝግጁ ነው!** 🌟\n\nአንተ/ቺ **${zodiacData?.icon} ${zodiacData?.am}** ነህ/ሽ። ለኮከብህ/ሽ የሚመጥኑትን በመፈለግ ላይ፦ ${compatibleZodiacs.join(', ')}...`
+        : `🌟 **Zodiac Mode Active!** 🌟\n\nYou are a **${zodiacData?.icon} ${userProfile.zodiac}**. I'm looking for your most compatible stars: ${compatibleZodiacs.join(', ')}...`,
+        { parse_mode: 'Markdown' });
 
     return showNextZodiacProfile(ctx, userProfile, compatibleZodiacs);
 });
@@ -67,12 +74,14 @@ async function showNextZodiacProfile(ctx: Scenes.SceneContext, userProfile: any,
         // Check if we have skipped profiles to loop back to
         const session = ctx.session as any;
         if (session.skippedIds && session.skippedIds.length > 0) {
-            await ctx.reply("Reached the end of the stars! 🔄 Looping back to compatible matches you skipped...");
+            const lang = userProfile.language || 'en';
+            await ctx.reply(lang === 'am' ? "የከዋክብት ጉዞው አብቅቷል! 🔄 የዘለልካቸውን ተኳሾች በማምጣት ላይ..." : "Reached the end of the stars! 🔄 Looping back to compatible matches you skipped...");
             session.skippedIds = []; // Reset
             return showNextZodiacProfile(ctx, userProfile, compatibleZodiacs);
         }
 
-        await ctx.reply("I couldn't find any more compatible stars for now. 🌌 Try standard Discovery or check back later!");
+        const lang = userProfile.language || 'en';
+        await ctx.reply(lang === 'am' ? "ለአሁኑ የሚመጥን ኮከብ አላገኘሁም። 🌌 ወደ መደበኛው 'Discovery' ሂድ ወይስ ቆይተህ ሞክር!" : "I couldn't find any more compatible stars for now. 🌌 Try standard Discovery or check back later!");
         return ctx.scene.leave();
     }
 
@@ -84,9 +93,17 @@ async function showNextZodiacProfile(ctx: Scenes.SceneContext, userProfile: any,
 }
 
 async function renderZodiacProfile(ctx: Scenes.SceneContext, target: any, userProfile: any, compatibleZodiacs: string[]) {
+    const lang = userProfile.language || 'en';
     const targetZodiac = ZODIACS.find(z => z.name === target.zodiac);
 
-    const caption = `⭐ **Zodiac Match!** ⭐\n\n` +
+    const caption = lang === 'am'
+        ? `⭐ **የኮከብ ተዛማጅ!** ⭐\n\n` +
+        `**${target.first_name}** (${target.age})\n` +
+        `**ኮከብ:** ${targetZodiac?.icon} ${targetZodiac?.am}\n` +
+        `**አድራሻ:** ${target.sub_city || target.city}\n` +
+        `**ባዮ:** ${target.bio || 'የለም'}\n\n` +
+        `ከዋክብት እንደሚመጥኑላችሁ ይናገራሉ! ❤️`
+        : `⭐ **Zodiac Match!** ⭐\n\n` +
         `**${target.first_name}** (${target.age})\n` +
         `**Zodiac:** ${targetZodiac?.icon} ${target.zodiac}\n` +
         `**Location:** ${target.sub_city || target.city}\n` +
@@ -95,20 +112,20 @@ async function renderZodiacProfile(ctx: Scenes.SceneContext, target: any, userPr
 
     const buttons = [
         [
-            Markup.button.callback('❌ Pass', `zodiac_dislike_${target.id}`),
-            Markup.button.callback('❤️ Like!', `zodiac_like_${target.id}`)
+            Markup.button.callback(lang === 'am' ? '❌ እለፈው' : '❌ Pass', `zodiac_dislike_${target.id}`),
+            Markup.button.callback(lang === 'am' ? '❤️ ላይክ!' : '❤️ Like!', `zodiac_like_${target.id}`)
         ],
         [
-            Markup.button.callback('↩️ Undo', 'undo_zodiac_swipe'),
-            Markup.button.callback('🏠 Menu', 'back_to_menu')
+            Markup.button.callback(lang === 'am' ? '↩️ ተመለስ' : '↩️ Undo', 'undo_zodiac_swipe'),
+            Markup.button.callback(lang === 'am' ? '🏠 ዝርዝር' : '🏠 Menu', 'back_to_menu')
         ]
     ];
 
     const extraButtons = [];
     if (target.voice_intro_url) {
-        extraButtons.push(Markup.button.callback('🎤 Voice Intro', `play_zodiac_voice_${target.id}`));
+        extraButtons.push(Markup.button.callback(lang === 'am' ? '🎤 ድምጽ' : '🎤 Voice Intro', `play_zodiac_voice_${target.id}`));
     }
-    extraButtons.push(Markup.button.callback('Next ⏭️', `next_zodiac_profile_${target.id}`));
+    extraButtons.push(Markup.button.callback(lang === 'am' ? 'ቀጣይ ⏭️' : 'Next ⏭️', `next_zodiac_profile_${target.id}`));
 
     if (extraButtons.length > 0) {
         buttons.push(extraButtons);
@@ -195,13 +212,16 @@ zodiacDiscoveryScene.action(/zodiac_(like|dislike)_(.+)/, async (ctx) => {
             const { data: targetProfile } = await supabase.from('profiles').select('*').eq('id', targetId).single();
             const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', userId!).single();
 
-            await ctx.reply(`🎉 It's a Celestial Match! You and ${targetProfile.first_name} are written in the stars.`);
+            const lang = myProfile.language || 'en';
+            await ctx.replyWithMarkdown(t(lang, 'MATCH.CELESTIAL', targetProfile.first_name));
 
             try {
-                await ctx.telegram.sendMessage(targetId as string,
-                    `🌟 **Celestial Match!**\n\n${myProfile.first_name} liked you too! The stars aligned.\n\n[Open Chat](tg://user?id=${userId})`,
-                    { parse_mode: 'Markdown' }
-                );
+                const targetLang = targetProfile.language || 'en';
+                const notifyMsg = targetLang === 'am'
+                    ? `🌟 **የከዋክብት ተዛማጅ!**\n\n**${myProfile.first_name}** ወዶሃል/ሻል! ከዋክብት ተስማምተዋል።\n\n[Open Chat](tg://user?id=${userId})`
+                    : `🌟 **Celestial Match!**\n\n**${myProfile.first_name}** liked you too! The stars aligned.\n\n[Open Chat](tg://user?id=${userId})`;
+
+                await ctx.telegram.sendMessage(targetId as string, notifyMsg, { parse_mode: 'Markdown' });
             } catch (e) { }
         } else {
             // Notify target of a celestial like
@@ -259,13 +279,32 @@ zodiacDiscoveryScene.action('undo_zodiac_swipe', async (ctx) => {
     const compatibleZodiacs = ZODIAC_COMPATIBILITY[userProfile.zodiac] || [];
 
     if (previousProfile) {
-        await ctx.answerCbQuery("The stars are rewinding... 🌌");
+        const lang = userProfile.language || 'en';
+        await ctx.answerCbQuery(lang === 'am' ? "ከዋክብት ወደ ኋላ በመመለስ ላይ... 🌌" : "The stars are rewinding... 🌌");
         try { await ctx.deleteMessage(); } catch (e) { }
         return renderZodiacProfile(ctx, previousProfile, userProfile, compatibleZodiacs);
     } else {
-        await ctx.answerCbQuery("Could not restore. Let's find someone new!");
+        const lang = userProfile.language || 'en';
+        await ctx.answerCbQuery(lang === 'am' ? "መመለስ አልተቻለም አዲስ እንፈልግ!" : "Could not restore. Let's find someone new!");
         return showNextZodiacProfile(ctx, userProfile, compatibleZodiacs);
     }
 });
 
-zodiacDiscoveryScene.action('back_to_menu', (ctx) => ctx.scene.leave());
+zodiacDiscoveryScene.action('back_to_menu', async (ctx) => {
+    const { data: profile } = await supabase.from('profiles').select('language').eq('id', ctx.from?.id).single();
+    const lang = profile?.language || 'en';
+
+    await ctx.scene.leave();
+    await ctx.replyWithMarkdown(t(lang, 'WELCOME'), {
+        reply_markup: {
+            keyboard: lang === 'am' ? [
+                [{ text: '🚀 ፍለጋ (Discovery)' }, { text: '🌟 ኮከብ ተኳሽ' }],
+                [{ text: '👤 ፕሮፋይሌ' }, { text: '💬 የኔ ተዛማጆች' }]
+            ] : [
+                [{ text: '🚀 Discovery' }, { text: '🌟 Zodiac Match' }],
+                [{ text: '👤 My Profile' }, { text: '💬 My Matches' }]
+            ],
+            resize_keyboard: true
+        }
+    });
+});

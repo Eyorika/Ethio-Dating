@@ -4,7 +4,9 @@ import { supabase } from '../services/supabase.js';
 export const likersScene = new Scenes.BaseScene<Scenes.SceneContext>('LIKERS_SCENE');
 
 likersScene.enter(async (ctx) => {
-    await ctx.reply("Checking out who's been eyeing your profile... ❤️");
+    const { data: profile } = await supabase.from('profiles').select('language').eq('id', ctx.from?.id).single();
+    const lang = profile?.language || 'en';
+    await ctx.reply(lang === 'am' ? "ማን እንደወደደህ/ሽ በማየት ላይ... ❤️" : "Checking out who's been eyeing your profile... ❤️");
     return showNextLiker(ctx);
 });
 
@@ -19,8 +21,11 @@ async function showNextLiker(ctx: Scenes.SceneContext) {
         .eq('swiped_id', userId)
         .eq('type', 'like');
 
+    const { data: myProfileData } = await supabase.from('profiles').select('language').eq('id', userId).single();
+    const lang = myProfileData?.language || 'en';
+
     if (!admirers || admirers.length === 0) {
-        await ctx.reply("No new likes yet! Keep your profile fresh and Arada. ✨");
+        await ctx.reply(lang === 'am' ? "እስካሁን ምንም ላይክ የለም! ፕሮፋይልህን/ሽን አድስ/ሺ። ✨" : "No new likes yet! Keep your profile fresh and Arada. ✨");
         return ctx.scene.enter('PROFILE_SCENE');
     }
 
@@ -37,7 +42,7 @@ async function showNextLiker(ctx: Scenes.SceneContext) {
     const pendingLikerIds = admirerIds.filter(id => !alreadySwipedIds.includes(id as any));
 
     if (pendingLikerIds.length === 0) {
-        await ctx.reply("You've seen all your current admirers! Try Discovery to find more. 🚀");
+        await ctx.reply(lang === 'am' ? "ሁሉንም አይተሃል/ሻል! አዳዲስ ሰዎችን ለመፈለግ 'Discovery' ተጠቀም። 🚀" : "You've seen all your current admirers! Try Discovery to find more. 🚀");
         return ctx.scene.enter('PROFILE_SCENE');
     }
 
@@ -51,7 +56,13 @@ async function showNextLiker(ctx: Scenes.SceneContext) {
 
     if (!target) return showNextLiker(ctx);
 
-    const caption = `❤️ **${target.first_name} liked you!**\n\n` +
+    const caption = lang === 'am'
+        ? `❤️ **${target.first_name} ወዶሃል/ሻል!**\n\n` +
+        `**እድሜ:** ${target.age}\n` +
+        `**አድራሻ:** ${target.sub_city || target.city}\n` +
+        `**ባዮ:** ${target.bio || 'የለም'}\n\n` +
+        `ተዛማጅ መሆን ትፈልጋለህ/ሽ?`
+        : `❤️ **${target.first_name} liked you!**\n\n` +
         `**Age:** ${target.age}\n` +
         `**Location:** ${target.sub_city || target.city}\n` +
         `**Bio:** ${target.bio || 'No bio'}\n\n` +
@@ -62,10 +73,10 @@ async function showNextLiker(ctx: Scenes.SceneContext) {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
             [
-                Markup.button.callback('❌ Pass', `liker_dislike_${target.id}`),
-                Markup.button.callback('❤️ Like Back!', `liker_like_${target.id}`)
+                Markup.button.callback(lang === 'am' ? '❌ እለፈው' : '❌ Pass', `liker_dislike_${target.id}`),
+                Markup.button.callback(lang === 'am' ? '❤️ ላይክ መልስ!' : '❤️ Like Back!', `liker_like_${target.id}`)
             ],
-            [Markup.button.callback('⬅️ Back to Profile', 'back_to_profile')]
+            [Markup.button.callback(lang === 'am' ? '⬅️ ወደ ፕሮፋይል ተመለስ' : '⬅️ Back to Profile', 'back_to_profile')]
         ])
     });
 }
@@ -82,6 +93,9 @@ likersScene.action(/liker_(like|dislike)_(.+)/, async (ctx) => {
     });
 
     if (type === 'like') {
+        const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', userId!).single();
+        const lang = myProfile?.language || 'en';
+
         // It's a guaranteed match because we are in the "Who Liked Me" list
         await supabase.from('matches').insert({
             user1_id: userId,
@@ -89,16 +103,19 @@ likersScene.action(/liker_(like|dislike)_(.+)/, async (ctx) => {
         });
 
         const { data: targetProfile } = await supabase.from('profiles').select('*').eq('id', targetId).single();
-        const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', userId!).single();
 
-        await ctx.reply(`🎉 It's a Match with ${targetProfile.first_name}! You can now chat.`);
+        await ctx.reply(lang === 'am'
+            ? `🎉 ከ ${targetProfile.first_name} ጋር ተዛምደሃል/ሻል! አሁን ማውራት ትችላላችሁ።`
+            : `🎉 It's a Match with ${targetProfile.first_name}! You can now chat.`);
 
         // Notify target
         try {
-            await ctx.telegram.sendMessage(targetId as string,
-                `አይበረኩም! 🎉 **${myProfile.first_name}** liked you back! It's a match.\n\n[Open Chat](tg://user?id=${userId})`,
-                { parse_mode: 'Markdown' }
-            );
+            const targetLang = targetProfile?.language || 'en';
+            const notifyMsg = targetLang === 'am'
+                ? `አይበረኩም! 🎉 **${myProfile.first_name}** የሰጠኸውን/ሽን ላይክ መልሷል/ሳለች! ተዛምዳችኋል።\n\n[Open Chat](tg://user?id=${userId})`
+                : `አይበረኩም! 🎉 **${myProfile.first_name}** liked you back! It's a match.\n\n[Open Chat](tg://user?id=${userId})`;
+
+            await ctx.telegram.sendMessage(targetId as string, notifyMsg, { parse_mode: 'Markdown' });
         } catch (e) { }
     }
 

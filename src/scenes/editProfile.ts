@@ -1,6 +1,6 @@
 import { Scenes, Markup } from 'telegraf';
 import { supabase } from '../services/supabase.js';
-import { KIFLE_KETEMAS, PROMPTS, ZODIACS } from '../content/prompts.js';
+import { KIFLE_KETEMAS, PROMPTS, ZODIACS, t } from '../content/prompts.js';
 
 // Edit Bio Wizard
 export const editBioWizard = new Scenes.WizardScene(
@@ -131,9 +131,7 @@ export const editLocationWizard = new Scenes.WizardScene(
         const lang = profile?.language || 'en';
         (ctx.wizard.state as any).language = lang;
 
-        const locPrompt = lang === 'am'
-            ? "ግዛትህ የት ነው? 📍 አዲስ አበባ ወይስ ከዛ ውጭ?"
-            : PROMPTS.REGISTRATION.LOCATION;
+        const locPrompt = t(lang, 'REGISTRATION.LOCATION');
 
         await ctx.reply(locPrompt, {
             reply_markup: {

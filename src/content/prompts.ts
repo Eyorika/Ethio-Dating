@@ -1,22 +1,46 @@
 // ጠበሳ (Tebesa) Content & Personality
 
 export const PROMPTS = {
-    WELCOME: `Selam Arada! 👋 I’m **Tebesa**, your digital wingman. I’m not here to just show you photos; I’m here to find your *vibe-mate*.\n\nWhether you’re a **Bole** 'Burger' lover or a **Piassa** 'Macchiato' enthusiast, I’ve got someone for you. ዝግጁ ነህ/ነሽ? (Are you ready?) Let’s get you set up!`,
+    WELCOME: {
+        en: `Selam Arada! 👋 I’m **Tebesa**, your digital wingman. I’m not here to just show you photos; I’m here to find your *vibe-mate*.\n\nWhether you’re a **Bole** 'Burger' lover or a **Piassa** 'Macchiato' enthusiast, I’ve got someone for you. ዝግጁ ነህ/ነሽ? (Are you ready?) Let’s get you set up!`,
+        am: `ሰላም አራዳ! 👋 እኔ **ጠበሳ** ነኝ፤ ያንተ/ያንቺ ዲጂታል አገናኝ። እዚህ የመጣሁት ፎቶዎች ለማሳየት ብቻ ሳይሆን ላንተ/ላንቺ *የሚመጥን* ሰው ለማግኘት ነው።\n\nከቦሌ 'በርገር' አፍቃሪ እስከ ፒያሳ 'ማኪያቶ' ወዳድ፤ ለሁሉም የሚሆን ሰው አለኝ። ዝግጁ ነህ/ነሽ? እንጀምር!`
+    },
 
     REGISTRATION: {
-        LOCATION: "Where’s your territory? 📍 Are you holding it down in **Addis** (which Kifle Ketema?), or are you repping **Adama, Hawassa,** or elsewhere?",
-        RELIGION: "Faith matters! ⛪️🕌 Who should I look for? (Orthodox, Muslim, Protestant, etc.) I want to make sure the connection is deep from the start.",
-        LIFESTYLE: "Pick your weekend vibe: 💃 **Club night in Bole**, ☕ **Chill cafe in Kazanchis**, or 🏠 **Netflix & Doro Wot** at home?",
-        PHOTO_VERIFY: "Hold up, Gorgeous/Sheba! ✋\n\nBefore I let you into the VIP section, I need to make sure you’re real. Nobody likes a 'Catfish.' 🐟\n\nSnap a quick selfie holding up **two fingers (Peace sign)**. Only my eyes will see it, then you’re officially **Verified Arada**! ✅"
+        LOCATION: {
+            en: "Where’s your territory? 📍 Are you holding it down in **Addis** (which Kifle Ketema?), or are you repping **Adama, Hawassa,** or elsewhere?",
+            am: "ግዛትህ/ሽ የት ነው? 📍 አዲስ አበባ (የትኛው ክፍለ ከተማ?) ወይስ አዳማ፣ ሀዋሳ...?"
+        },
+        RELIGION: {
+            en: "Faith matters! ⛪️🕌 Who should I look for? (Orthodox, Muslim, Protestant, etc.) I want to make sure the connection is deep from the start.",
+            am: "ሃይማኖት ወሳኝ ነው! ⛪️🕌 ማንን ልፈልግልህ/ሽ? (ኦርቶዶክስ፣ ሙስሊም፣ ፕሮቴስታንት...)"
+        },
+        LIFESTYLE: {
+            en: "Pick your weekend vibe: 💃 **Club night in Bole**, ☕ **Chill cafe in Kazanchis**, or 🏠 **Netflix & Doro Wot** at home?",
+            am: "የሳምንቱ መጨረሻ ምርጫህ/ሽ፦ 💃 **ቦሌ ክለብ**፣ ☕ **ካዛንቺስ ካፌ**፣ ወይስ 🏠 **ቤት ውስጥ ፊልም**?"
+        },
+        PHOTO_VERIFY: {
+            en: "Hold up, Gorgeous/Sheba! ✋\n\nBefore I let you into the VIP section, I need to make sure you’re real. Snap a quick selfie holding up **two fingers (Peace sign)**. Only my eyes will see it, then you’re officially **Verified Arada**! ✅",
+            am: "ቆይ ቆይ ቆንጆ! ✋\n\nወደ VIP ክፍሉ ከማስገባትህ/ሽ በፊት፤ ማንነትህን/ሽን ማረጋገጥ አለብኝ። **የሰላም ምልክት (ሁለት ጣት)** እያሳየህ/ሽ selfie ላክልኝ። እኔ አይቼው ወዲያውኑ **Verified Arada** ትሆናለህ/ሽ! ✅"
+        }
     },
 
     MATCH: {
-        CELEBRATION: (name: string, city: string) => `አይበረኩም! (Incredible!) 🎉 It’s a **Match!**\n\nYou and ${name} both think **${city}** is the most romantic city. The ball is in your court now. Don't be a 'Fara'—send the first message!\n\n**Pro-tip:** Ask about their favorite spot for Kitfo. Works every time. 😉`,
-        NUDGE: (name: string) => `Wait... you guys are still quiet? 🤐\n\n${name} is waiting for a 'Selam'! Don't let this vibe go to waste. Use my **'Magic Icebreaker'** button if you’re feeling shy, and I’ll send a funny opener for you!`
+        CELEBRATION: {
+            en: (name: string) => `አይበረኩም! 🎉 It’s a **Match!**\n\nYou and ${name} are a great match. Don't be a 'Fara'—send the first message! 😉`,
+            am: (name: string) => `አይበረኩም! 🎉 **ተዛምደሃል/ሻል!**\n\nአንተ/ቺ እና ${name} ተገጣጥማችኋል። ፋራ አትሁን/ኚ፤ የመጀመሪያውን መልእክት ላክ/ኪ! 😉`
+        },
+        CELESTIAL: {
+            en: (name: string) => `🎉 It's a **Celestial Match!**\n\nYou and ${name} are written in the stars. ✨`,
+            am: (name: string) => `🎉 **የአምሳያ ኮከብ ተገኝቷል!**\n\nከ ${name} ጋር ከዋክብት ተገጣጥመዋል። ✨`
+        }
     },
 
     SYSTEM: {
-        NO_MORE_SWIPES: "You’ve seen everyone for today! 🛑\n\nEven a wingman needs a coffee break. Go out, live your life, and I’ll have a fresh batch of profiles waiting for you tomorrow morning. See you then! ☕✨"
+        NO_MORE_SWIPES: {
+            en: "You’ve seen everyone for today! 🛑\n\nEven a wingman needs a coffee break. I’ll have a fresh batch of profiles waiting for you tomorrow morning. See you then! ☕✨",
+            am: "ለዛሬ ሁሉንም አይተሃል/ሻል! 🛑\n\nጠበሳም የቡና እረፍት ያስፈልገዋል። እስከ ነገ ጠዋት ድረስ ሌሎች አዳዲስ ሰዎችን አዘጋጃለሁ። ቻው! ☕✨"
+        }
     }
 };
 
@@ -96,3 +120,26 @@ export const ZODIAC_COMPATIBILITY: { [key: string]: string[] } = {
     'Aquarius': ['Gemini', 'Libra', 'Aries', 'Leo', 'Sagittarius'],
     'Pisces': ['Cancer', 'Scorpio', 'Taurus', 'Virgo', 'Capricorn']
 };
+
+/**
+ * Translation helper
+ * @param lang 'en' or 'am'
+ * @param path dot notation path (e.g. 'WELCOME' or 'REGISTRATION.LOCATION')
+ * @param params optional parameters for functions
+ */
+export const t = (lang: 'en' | 'am' | string, path: string, ...params: any[]): string => {
+    const keys = path.split('.');
+    let current: any = PROMPTS;
+
+    for (const key of keys) {
+        if (current[key] === undefined) return path;
+        current = current[key];
+    }
+
+    const val = current[lang] || current['en'];
+    if (typeof val === 'function') {
+        return val(...params);
+    }
+    return val || path;
+};
+

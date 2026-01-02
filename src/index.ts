@@ -1,6 +1,6 @@
 import { Telegraf, Scenes, session, Markup } from 'telegraf';
 import dotenv from 'dotenv';
-import { PROMPTS, ICEBREAKERS } from './content/prompts.js';
+import { PROMPTS, t, ICEBREAKERS } from './content/prompts.js';
 import { supabase } from './services/supabase.js';
 
 dotenv.config();
@@ -19,6 +19,7 @@ import { likersScene } from './scenes/likers.js';
 import { matchesScene } from './scenes/matches.js';
 import { zodiacDiscoveryScene } from './scenes/zodiacDiscovery.js';
 import { filtersScene } from './scenes/filters.js';
+import { verificationScene } from './scenes/verification.js';
 
 const bot = new Telegraf<Scenes.SceneContext>(token);
 
@@ -105,10 +106,23 @@ bot.use(async (ctx, next) => {
 
 bot.use(stage.middleware());
 
-bot.start((ctx) => {
-    ctx.replyWithMarkdown(PROMPTS.WELCOME, {
+bot.start(async (ctx) => {
+    const startPayload = ctx.payload;
+    if (startPayload && startPayload.startsWith('ref_')) {
+        const referrerId = startPayload.replace('ref_', '');
+        (ctx.session as any).referrerId = referrerId;
+    }
+
+    const userId = ctx.from?.id;
+    const { data: profile } = await supabase.from('profiles').select('language').eq('id', userId).single();
+    const lang = profile?.language || 'en';
+
+    ctx.replyWithMarkdown(t(lang, 'WELCOME'), {
         reply_markup: {
-            keyboard: [
+            keyboard: lang === 'am' ? [
+                [{ text: '🚀 ፍለጋ (Discovery)' }, { text: '🌟 ኮከብ ተኳሽ' }],
+                [{ text: '👤 ፕሮፋይሌ' }, { text: '💬 የኔ ተዛማጆች' }]
+            ] : [
                 [{ text: '🚀 Discovery' }, { text: '🌟 Zodiac Match' }],
                 [{ text: '👤 My Profile' }, { text: '💬 My Matches' }]
             ],
@@ -117,10 +131,10 @@ bot.start((ctx) => {
     });
 });
 
-bot.hears('🚀 Discovery', (ctx) => ctx.scene.enter('DISCOVERY_SCENE'));
-bot.hears('🌟 Zodiac Match', (ctx) => ctx.scene.enter('ZODIAC_DISCOVERY_SCENE'));
-bot.hears('👤 My Profile', (ctx) => ctx.scene.enter('PROFILE_SCENE'));
-bot.hears('💬 My Matches', (ctx) => ctx.scene.enter('MATCHES_SCENE'));
+bot.hears(['🚀 Discovery', '🚀 ፍለጋ (Discovery)'], (ctx) => ctx.scene.enter('DISCOVERY_SCENE'));
+bot.hears(['🌟 Zodiac Match', '🌟 ኮከብ ተኳሽ', '🌟 ከክብ ተኳሽ', '🌟 ከከብ ተኳሽ'], (ctx) => ctx.scene.enter('ZODIAC_DISCOVERY_SCENE'));
+bot.hears(['👤 My Profile', '👤 ፕሮፋይሌ'], (ctx) => ctx.scene.enter('PROFILE_SCENE'));
+bot.hears(['💬 My Matches', '💬 የኔ ተዛማጆች'], (ctx) => ctx.scene.enter('MATCHES_SCENE'));
 bot.command('register', (ctx) => ctx.scene.enter('REGISTRATION_SCENE'));
 bot.command('discovery', (ctx) => ctx.scene.enter('DISCOVERY_SCENE'));
 bot.command('profile', (ctx) => ctx.scene.enter('PROFILE_SCENE'));
@@ -267,7 +281,7 @@ bot.action(/ice_send_(.+)_(.+)/, async (ctx) => {
     }
 });
 
-import { verificationScene } from './scenes/verification.js';
+
 
 bot.action('try_again_verification', (ctx) => ctx.scene.enter('VERIFICATION_SCENE'));
 

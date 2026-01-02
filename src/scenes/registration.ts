@@ -1,5 +1,5 @@
 import { Scenes, Markup } from 'telegraf';
-import { PROMPTS, KIFLE_KETEMAS, RELIGIONS, ZODIACS } from '../content/prompts.js';
+import { PROMPTS, KIFLE_KETEMAS, RELIGIONS, ZODIACS, t } from '../content/prompts.js';
 import { supabase } from '../services/supabase.js';
 
 export const registrationWizard = new Scenes.WizardScene(
@@ -22,9 +22,7 @@ export const registrationWizard = new Scenes.WizardScene(
         const lang = (ctx.message as any).text;
         (ctx.wizard.state as any).language = lang === 'አማርኛ 🇪🇹' ? 'am' : 'en';
 
-        const prompt = (ctx.wizard.state as any).language === 'am'
-            ? "በመጀመሪያ ምን ብዬ ልጥራህ/ሽ? (ስም)"
-            : "First things first, what should I call you? (Name)";
+        const prompt = t((ctx.wizard.state as any).language, 'WELCOME');
 
         await ctx.reply(prompt);
         return ctx.wizard.next();
@@ -88,9 +86,7 @@ export const registrationWizard = new Scenes.WizardScene(
         if (interestText === 'ሴቶች' || interestText === 'female') interest = 'female';
         (ctx.wizard.state as any).interested_in = interest;
 
-        const locPrompt = (ctx.wizard.state as any).language === 'am'
-            ? "ግዛትህ የት ነው? 📍 አዲስ አበባ ወይስ ከዛ ውጭ?"
-            : PROMPTS.REGISTRATION.LOCATION;
+        const locPrompt = t((ctx.wizard.state as any).language, 'REGISTRATION.LOCATION');
 
         await ctx.reply(locPrompt, {
             reply_markup: {
@@ -134,7 +130,7 @@ export const registrationWizard = new Scenes.WizardScene(
             (ctx.wizard.state as any).city = msg;
         }
 
-        await ctx.replyWithMarkdown(PROMPTS.REGISTRATION.RELIGION, {
+        await ctx.replyWithMarkdown(t((ctx.wizard.state as any).language, 'REGISTRATION.RELIGION'), {
             reply_markup: {
                 keyboard: RELIGIONS.map(r => [{ text: r }]),
                 one_time_keyboard: true,
@@ -208,7 +204,7 @@ export const registrationWizard = new Scenes.WizardScene(
         } else if ((ctx.message as any).text === '⏭️ Skip' || (ctx.message as any).text === '⏭️ እለፈው') {
             await ctx.reply(lang === 'am' ? "ችግር የለም! የመጨረሻው ደረጃ... 🔒" : "No problem! Final step... 🔒", Markup.removeKeyboard());
         }
-        await ctx.replyWithMarkdown(PROMPTS.REGISTRATION.PHOTO_VERIFY);
+        await ctx.replyWithMarkdown(t(lang, 'REGISTRATION.PHOTO_VERIFY'));
         return ctx.wizard.next();
     },
     // Step 10: Verification (Peace Sign)
@@ -237,7 +233,8 @@ export const registrationWizard = new Scenes.WizardScene(
                 voice_intro_url: data.voice_intro_url,
                 verification_photo_url: data.verification_photo,
                 language: data.language,
-                is_verified: false
+                is_verified: false,
+                referred_by: ((ctx as unknown) as Scenes.SceneContext).session && (((ctx as unknown) as Scenes.SceneContext).session as any).referrerId || null
             });
 
             if (error) {
@@ -260,6 +257,30 @@ export const registrationWizard = new Scenes.WizardScene(
                         );
                     } catch (e) {
                         console.error("Failed to notify admin:", e);
+                    }
+                }
+
+                // Handle Referrer Bonus notification and count update
+                const referrerId = ((ctx as unknown) as Scenes.SceneContext).session && (((ctx as unknown) as Scenes.SceneContext).session as any).referrerId;
+                if (referrerId) {
+                    try {
+                        // 1. Increment referrer's count
+                        const { data: referrer, error: refError } = await supabase.rpc('increment_referral_count', { user_id: referrerId });
+                        if (refError) throw refError;
+
+                        // 2. Notify referrer
+                        const { data: refProfile } = await supabase.from('profiles').select('language').eq('id', referrerId).single();
+                        const refLang = refProfile?.language || 'en';
+                        const refNotifyMsg = refLang === 'am'
+                            ? `🎉 ድንቅ ዜና! ጓደኛህ/ሽ **${data.name}** ተቀላቅሏል። አሁን የበለጠ አራዳ ሆነሃል/ሻል! 🚀`
+                            : `🎉 Great news! Your friend **${data.name}** just joined. You're now more 'Arada' than ever! 🚀`;
+
+                        await ctx.telegram.sendMessage(referrerId, refNotifyMsg);
+
+                        // Clear referrer from session
+                        delete (((ctx as unknown) as Scenes.SceneContext).session as any).referrerId;
+                    } catch (e) {
+                        console.error("Failed to update/notify referrer:", e);
                     }
                 }
             }

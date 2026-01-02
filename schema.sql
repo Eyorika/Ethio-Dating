@@ -22,6 +22,8 @@ CREATE TABLE profiles (
     language TEXT DEFAULT 'en',
     zodiac TEXT,
     rejection_reason TEXT, -- Reason for verification rejection
+    referred_by BIGINT, -- ID of the user who referred this person
+    referral_count INT DEFAULT 0, -- How many people this user has referred
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -83,3 +85,13 @@ CREATE TABLE IF NOT EXISTS reports (
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Enable insert for all" ON reports FOR INSERT WITH CHECK (true);
 CREATE POLICY "Enable select for admin" ON reports FOR SELECT USING (true);
+
+-- Function to safely increment referral count
+CREATE OR REPLACE FUNCTION increment_referral_count(user_id BIGINT)
+RETURNS void AS $$
+BEGIN
+    UPDATE profiles
+    SET referral_count = referral_count + 1
+    WHERE id = user_id;
+END;
+$$ LANGUAGE plpgsql;

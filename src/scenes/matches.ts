@@ -5,7 +5,10 @@ export const matchesScene = new Scenes.BaseScene<Scenes.SceneContext>('MATCHES_S
 
 matchesScene.enter(async (ctx) => {
     const userId = ctx.from?.id;
-    await ctx.reply("Fetching your Arada connections... 🥂");
+    const { data: profile } = await supabase.from('profiles').select('language').eq('id', userId).single();
+    const lang = profile?.language || 'en';
+
+    await ctx.reply(lang === 'am' ? "ተዛማጆችህን/ሽን በማምጣት ላይ... 🥂" : "Fetching your Arada connections... 🥂");
 
     // Fetch matches where user is user1 or user2
     const { data: matches, error } = await supabase
@@ -15,11 +18,11 @@ matchesScene.enter(async (ctx) => {
         .order('created_at', { ascending: false });
 
     if (error || !matches || matches.length === 0) {
-        await ctx.reply("No matches yet! Keep swiping in Discovery to find your vibe-mate. 🚀");
+        await ctx.reply(lang === 'am' ? "እስካሁን ምንም ተዛማጅ የለም! ሰዎችን ለመፈለግ 'Discovery' ተጠቀም። 🚀" : "No matches yet! Keep swiping in Discovery to find your vibe-mate. 🚀");
         return ctx.scene.leave();
     }
 
-    await ctx.reply(`You have **${matches.length}** matches! Click to open chat:`, { parse_mode: 'Markdown' });
+    await ctx.reply(lang === 'am' ? `**${matches.length}** ተዛማጆች አሉህ/ሽ! ለማውራት ስማቸውን ንካ፦` : `You have **${matches.length}** matches! Click to open chat:`, { parse_mode: 'Markdown' });
 
     for (const match of matches) {
         const otherId = match.user1_id === userId ? match.user2_id : match.user1_id;
@@ -38,8 +41,8 @@ matchesScene.enter(async (ctx) => {
                 {
                     parse_mode: 'HTML',
                     ...Markup.inlineKeyboard([
-                        [Markup.button.url('💬 Open Chat', chatLink)],
-                        [Markup.button.callback('🪄 Send Magic Icebreaker', `icebreaker_${otherId}`)]
+                        [Markup.button.url(lang === 'am' ? '💬 ማውራት ጀምር' : '💬 Open Chat', chatLink)],
+                        [Markup.button.callback(lang === 'am' ? '🪄 አስማታዊ መልእክት' : '🪄 Send Magic Icebreaker', `icebreaker_${otherId}`)]
                     ])
                 }
             );

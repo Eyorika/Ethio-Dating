@@ -1,11 +1,13 @@
 import { Scenes, Markup } from 'telegraf';
 import { supabase } from '../services/supabase.js';
-import { PROMPTS } from '../content/prompts.js';
+import { PROMPTS, t } from '../content/prompts.js';
 
 export const discoveryScene = new Scenes.BaseScene<Scenes.SceneContext>('DISCOVERY_SCENE');
 
 discoveryScene.enter(async (ctx) => {
-    await ctx.reply("Searching for your vibe-mate... 🔍");
+    const { data: profile } = await supabase.from('profiles').select('language').eq('id', ctx.from?.id).single();
+    const lang = profile?.language || 'en';
+    await ctx.reply(lang === 'am' ? "ተዛማጅ በመፈለግ ላይ... 🔍" : "Searching for your vibe-mate... 🔍");
     return showNextProfile(ctx);
 });
 
@@ -69,12 +71,13 @@ async function showNextProfile(ctx: Scenes.SceneContext) {
         // Check if we have skipped profiles to loop back to
         const session = ctx.session as any;
         if (session.skippedIds && session.skippedIds.length > 0) {
-            await ctx.reply("Reached the end! 🔄 Looping back to profiles you skipped...");
+            const lang = userProfile.language || 'en';
+            await ctx.reply(lang === 'am' ? "የመጨረሻው ላይ ደርሰዋል! 🔄 የዘለልካቸውን ሰዎች በድጋሚ በማምጣት ላይ..." : "Reached the end! 🔄 Looping back to profiles you skipped...");
             session.skippedIds = []; // Reset skipped IDs
             return showNextProfile(ctx); // Retry fetch
         }
 
-        await ctx.replyWithMarkdown(PROMPTS.SYSTEM.NO_MORE_SWIPES);
+        await ctx.replyWithMarkdown(t(userProfile.language, 'SYSTEM.NO_MORE_SWIPES'));
         return ctx.scene.leave();
     }
 
@@ -86,30 +89,35 @@ async function showNextProfile(ctx: Scenes.SceneContext) {
 }
 
 async function renderProfile(ctx: Scenes.SceneContext, target: any) {
-    const caption = `🔥 **${target.first_name}**, ${target.age}\n📍 ${target.sub_city || target.city}\n⛪️ ${target.religion || 'No religion specified'}\n\n"${target.bio || 'No bio yet'}"`;
+    const { data: myProfile } = await supabase.from('profiles').select('language').eq('id', ctx.from?.id).single();
+    const lang = myProfile?.language || 'en';
+
+    const caption = lang === 'am'
+        ? `🔥 **${target.first_name}**, ${target.age}\n📍 ${target.sub_city || target.city}\n⛪️ ${target.religion || 'አልተጠቀሰም'}\n\n"${target.bio || 'ባዮ የለም'}"`
+        : `🔥 **${target.first_name}**, ${target.age}\n📍 ${target.sub_city || target.city}\n⛪️ ${target.religion || 'No religion specified'}\n\n"${target.bio || 'No bio yet'}"`;
 
     const buttons = [
         [
-            Markup.button.callback('❌ Pass', `swipe_dislike_${target.id}`),
-            Markup.button.callback('❤️ Like', `swipe_like_${target.id}`)
+            Markup.button.callback(lang === 'am' ? '❌ እለፈው' : '❌ Pass', `swipe_dislike_${target.id}`),
+            Markup.button.callback(lang === 'am' ? '❤️ ውደደው' : '❤️ Like', `swipe_like_${target.id}`)
         ],
         [
-            Markup.button.callback('⚙️ Filters', 'open_filters'),
-            Markup.button.callback('↩️ Undo', 'undo_swipe')
+            Markup.button.callback(lang === 'am' ? '⚙️ ፊልተር' : '⚙️ Filters', 'open_filters'),
+            Markup.button.callback(lang === 'am' ? '↩️ ተመለስ' : '↩️ Undo', 'undo_swipe')
         ]
     ];
 
     const extraButtons = [];
     if (target.voice_intro_url) {
-        extraButtons.push(Markup.button.callback('🎤 Voice Intro', `play_voice_${target.id}`));
+        extraButtons.push(Markup.button.callback(lang === 'am' ? '🎤 ድምጽ' : '🎤 Voice Intro', `play_voice_${target.id}`));
     }
-    extraButtons.push(Markup.button.callback('Next ⏭️', `next_profile_${target.id}`));
+    extraButtons.push(Markup.button.callback(lang === 'am' ? 'ቀጣይ ⏭️' : 'Next ⏭️', `next_profile_${target.id}`));
 
     if (extraButtons.length > 0) {
         buttons.push(extraButtons);
     }
 
-    buttons.push([Markup.button.callback('🚩 Report User', `report_user_${target.id}`)]);
+    buttons.push([Markup.button.callback(lang === 'am' ? '🚩 ሪፖርት' : '🚩 Report User', `report_user_${target.id}`)]);
 
     try {
         await ctx.replyWithPhoto(target.photo_urls[0], {
@@ -197,9 +205,11 @@ discoveryScene.action(/swipe_(like|dislike)_(.+)/, async (ctx) => {
             const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', userId).single();
 
             // Notify CURRENT user (the swiper)
-            await ctx.replyWithMarkdown(PROMPTS.MATCH.CELEBRATION(targetProfile.first_name, targetProfile.sub_city || targetProfile.city), {
+            const lang = myProfile?.language || 'en';
+
+            await ctx.replyWithMarkdown(t(lang, 'MATCH.CELEBRATION', targetProfile.first_name), {
                 ...Markup.inlineKeyboard([
-                    [Markup.button.callback('🪄 Send Magic Icebreaker', `icebreaker_${targetId}`)]
+                    [Markup.button.callback(lang === 'am' ? '🪄 አስማታዊ መልእክት ላክ' : '🪄 Send Magic Icebreaker', `icebreaker_${targetId}`)]
                 ])
             });
 
