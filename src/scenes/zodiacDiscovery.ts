@@ -61,7 +61,7 @@ async function showNextZodiacProfile(ctx: Scenes.SceneContext, userProfile: any,
         query = query.eq('gender', userProfile.interested_in);
     }
 
-    const { data: profiles, error } = await query.limit(1);
+    const { data: profiles, error } = await query.limit(5);
 
     if (error || !profiles || profiles.length === 0) {
         // Check if we have skipped profiles to loop back to
@@ -76,7 +76,14 @@ async function showNextZodiacProfile(ctx: Scenes.SceneContext, userProfile: any,
         return ctx.scene.leave();
     }
 
-    const target = profiles[0];
+    // Pick random from batch
+    const target = profiles[Math.floor(Math.random() * profiles.length)];
+    if (!target) return showNextZodiacProfile(ctx, userProfile, compatibleZodiacs);
+
+    return renderZodiacProfile(ctx, target, userProfile, compatibleZodiacs);
+}
+
+async function renderZodiacProfile(ctx: Scenes.SceneContext, target: any, userProfile: any, compatibleZodiacs: string[]) {
     const targetZodiac = ZODIACS.find(z => z.name === target.zodiac);
 
     const caption = `⭐ **Zodiac Match!** ⭐\n\n` +
@@ -90,6 +97,10 @@ async function showNextZodiacProfile(ctx: Scenes.SceneContext, userProfile: any,
         [
             Markup.button.callback('❌ Pass', `zodiac_dislike_${target.id}`),
             Markup.button.callback('❤️ Like!', `zodiac_like_${target.id}`)
+        ],
+        [
+            Markup.button.callback('↩️ Undo', 'undo_zodiac_swipe'),
+            Markup.button.callback('🏠 Menu', 'back_to_menu')
         ]
     ];
 
@@ -103,8 +114,6 @@ async function showNextZodiacProfile(ctx: Scenes.SceneContext, userProfile: any,
         buttons.push(extraButtons);
     }
 
-    buttons.push([Markup.button.callback('🏠 Back to Menu', 'back_to_menu')]);
-
     try {
         await ctx.replyWithPhoto(target.photo_urls[0], {
             caption,
@@ -113,12 +122,7 @@ async function showNextZodiacProfile(ctx: Scenes.SceneContext, userProfile: any,
         });
     } catch (e) {
         console.error("Zodiac photo failed to send:", e);
-        await ctx.reply(`⭐ **Zodiac Match!** ⭐\n\n` +
-            `**${target.first_name}** (${target.age}) (Photo missing)\n` +
-            `**Zodiac:** ${targetZodiac?.icon} ${target.zodiac}\n` +
-            `**Location:** ${target.sub_city || target.city}\n` +
-            `**Bio:** ${target.bio || 'No bio'}\n\n` +
-            `The stars say you're a great match! ❤️`, {
+        await ctx.reply(caption, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard(buttons)
         });
@@ -199,6 +203,18 @@ zodiacDiscoveryScene.action(/zodiac_(like|dislike)_(.+)/, async (ctx) => {
                     { parse_mode: 'Markdown' }
                 );
             } catch (e) { }
+        } else {
+            // Notify target of a celestial like
+            const { data: targetProfile } = await supabase.from('profiles').select('language').eq('id', targetId).single();
+            const targetLang = targetProfile?.language || 'en';
+
+            const notifyMsg = targetLang === 'am'
+                ? "✨ አንድ አምሳያ ኮከብዎ ወዶታል! ማን እንደሆነ ለማየት በፕሮፋይልዎት ውስጥ '❤️ See Who Liked You' የሚለውን ይመልከቱ።"
+                : "✨ A compatible star just liked you! Check '❤️ See Who Liked You' in your profile to see who it is.";
+
+            try {
+                if (targetId) await ctx.telegram.sendMessage(targetId, notifyMsg);
+            } catch (e) { }
         }
     }
 
@@ -209,6 +225,47 @@ zodiacDiscoveryScene.action(/zodiac_(like|dislike)_(.+)/, async (ctx) => {
     const { data: userProfile } = await supabase.from('profiles').select('*').eq('id', userId).single();
     const compatibleZodiacs = ZODIAC_COMPATIBILITY[userProfile.zodiac] || [];
     return showNextZodiacProfile(ctx, userProfile, compatibleZodiacs);
+});
+
+// Handle Undo
+zodiacDiscoveryScene.action('undo_zodiac_swipe', async (ctx) => {
+    const userId = ctx.from?.id;
+
+    const { data: lastSwipe } = await supabase
+        .from('swipes')
+        .select('*')
+        .eq('swiper_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+    if (!lastSwipe) {
+        await ctx.answerCbQuery("Nothing to undo! 🤷‍♂️", { show_alert: true });
+        return;
+    }
+
+    // Delete swipe
+    await supabase.from('swipes').delete().eq('id', lastSwipe.id);
+
+    // If it was a like/match, delete match
+    if (lastSwipe.type === 'like') {
+        await supabase.from('matches').delete()
+            .or(`and(user1_id.eq.${userId},user2_id.eq.${lastSwipe.swiped_id}),and(user1_id.eq.${lastSwipe.swiped_id},user2_id.eq.${userId})`);
+    }
+
+    // Restore profile
+    const { data: previousProfile } = await supabase.from('profiles').select('*').eq('id', lastSwipe.swiped_id).single();
+    const { data: userProfile } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    const compatibleZodiacs = ZODIAC_COMPATIBILITY[userProfile.zodiac] || [];
+
+    if (previousProfile) {
+        await ctx.answerCbQuery("The stars are rewinding... 🌌");
+        try { await ctx.deleteMessage(); } catch (e) { }
+        return renderZodiacProfile(ctx, previousProfile, userProfile, compatibleZodiacs);
+    } else {
+        await ctx.answerCbQuery("Could not restore. Let's find someone new!");
+        return showNextZodiacProfile(ctx, userProfile, compatibleZodiacs);
+    }
 });
 
 zodiacDiscoveryScene.action('back_to_menu', (ctx) => ctx.scene.leave());

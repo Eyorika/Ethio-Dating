@@ -63,7 +63,7 @@ async function showNextProfile(ctx: Scenes.SceneContext) {
         query = query.eq('gender', userProfile.interested_in);
     }
 
-    const { data: profiles, error } = await query.limit(1);
+    const { data: profiles, error } = await query.limit(5);
 
     if (error || !profiles || profiles.length === 0) {
         // Check if we have skipped profiles to loop back to
@@ -78,7 +78,10 @@ async function showNextProfile(ctx: Scenes.SceneContext) {
         return ctx.scene.leave();
     }
 
-    const target = profiles[0];
+    // Pick a random one from the batch
+    const target = profiles[Math.floor(Math.random() * profiles.length)];
+    if (!target) return showNextProfile(ctx); // Fallback
+
     await renderProfile(ctx, target);
 }
 
@@ -215,8 +218,8 @@ discoveryScene.action(/swipe_(like|dislike)_(.+)/, async (ctx) => {
             const targetLang = targetProfile?.language || 'en';
 
             const notifyMsg = targetLang === 'am'
-                ? "👀 አንድ ሰው ወደዶታል! ማን እንደሆነ ለማየት በፕሮፋይልህ ውስጥ '❤️ See Who Liked You' የሚለውን ንካ።"
-                : "👀 Someone just liked you! Go to '❤️ See Who Liked You' in your profile to reveal them.";
+                ? "✨ አንድ ሰው ወደዶታል! ማን እንደሆነ ለማየት በፕሮፋይልህ ውስጥ '❤️ See Who Liked You' የሚለውን ንካ።"
+                : "✨ Someone just liked you! Go to '❤️ See Who Liked You' in your profile to find out who it is.";
 
             try {
                 if (targetId) {
