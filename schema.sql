@@ -21,6 +21,7 @@ CREATE TABLE profiles (
     is_banned BOOLEAN DEFAULT FALSE,
     language TEXT DEFAULT 'en',
     zodiac TEXT,
+    rejection_reason TEXT, -- Reason for verification rejection
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

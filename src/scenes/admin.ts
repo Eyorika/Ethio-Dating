@@ -88,9 +88,9 @@ adminScene.action(/approve_(.+)/, async (ctx) => {
 
 adminScene.action(/reject_(.+)/, async (ctx) => {
     const targetId = ctx.match[1];
-    await ctx.reply(`User ${targetId} rejected. (Add reason logic here) ❌`);
+    (ctx.scene.state as any).rejecting_user_id = targetId;
+    await ctx.reply(`❌ **Rejecting User ${targetId}**\n\nPlease type the reason for rejection (e.g., "Photo is blurry", "No peace sign").\n\nType 'cancel' to stop.`);
     await ctx.answerCbQuery();
-    return ctx.scene.reenter();
 });
 
 adminScene.action('start_broadcast', async (ctx) => {
@@ -101,35 +101,81 @@ adminScene.action('start_broadcast', async (ctx) => {
 
 adminScene.on('text', async (ctx) => {
     const state = ctx.scene.state as any;
-    if (!state.awaiting_broadcast) return;
+    const message = (ctx.message as any).text;
 
-    const message = ctx.message.text;
     if (message.toLowerCase() === 'cancel') {
+        if (state.awaiting_broadcast) await ctx.reply("Broadcast cancelled.");
+        if (state.rejecting_user_id) await ctx.reply("Rejection cancelled.");
+
         state.awaiting_broadcast = false;
+        state.rejecting_user_id = null;
         return ctx.scene.reenter();
     }
 
-    state.awaiting_broadcast = false;
-    await ctx.reply("🚀 Sending broadcast... this might take a while.");
+    if (state.awaiting_broadcast) {
+        state.awaiting_broadcast = false;
+        await ctx.reply("🚀 Sending broadcast... this might take a while.");
 
-    const { data: allUsers } = await supabase.from('profiles').select('id');
+        const { data: allUsers } = await supabase.from('profiles').select('id');
 
-    let success = 0;
-    let failed = 0;
+        let success = 0;
+        let failed = 0;
 
-    if (allUsers) {
-        for (const user of allUsers) {
-            try {
-                await ctx.telegram.sendMessage(user.id, `📢 **Arada News Update**\n\n${message}`, { parse_mode: 'Markdown' });
-                success++;
-            } catch (e) {
-                failed++;
+        if (allUsers) {
+            for (const user of allUsers) {
+                try {
+                    await ctx.telegram.sendMessage(user.id, `📢 **Arada News Update**\n\n${message}`, { parse_mode: 'Markdown' });
+                    success++;
+                } catch (e) {
+                    failed++;
+                }
             }
         }
+
+        await ctx.reply(`✅ Broadcast complete!\n\nSuccessful: ${success}\nFailed: ${failed}`);
+        return ctx.scene.reenter();
     }
 
-    await ctx.reply(`✅ Broadcast complete!\n\nSuccessful: ${success}\nFailed: ${failed}`);
-    return ctx.scene.reenter();
+    if (state.rejecting_user_id) {
+        const userId = state.rejecting_user_id;
+        const reason = message;
+
+        // Update DB
+        const { error } = await supabase
+            .from('profiles')
+            .update({
+                is_verified: false,
+                rejection_reason: reason
+            })
+            .eq('id', userId);
+
+        if (error) {
+            await ctx.reply(`Failed to update DB for user ${userId}: ${error.message}`);
+        } else {
+            // Notify User
+            try {
+                await ctx.telegram.sendMessage(userId,
+                    `🚫 **Verification Update**\n\n` +
+                    `Unfortunately, your profile verification was rejected.\n` +
+                    `**Reason:** ${reason}\n\n` +
+                    `Don't worry! You can try again right now. 👇`,
+                    {
+                        parse_mode: 'Markdown',
+                        ...Markup.inlineKeyboard([
+                            [Markup.button.callback('🔄 Try Again', 'try_again_verification')]
+                        ])
+                    }
+                );
+                await ctx.reply(`User ${userId} rejected and notified.`);
+            } catch (e) {
+                console.error(e);
+                await ctx.reply(`User ${userId} rejected but FAILED to notify (maybe they blocked the bot).`);
+            }
+        }
+
+        state.rejecting_user_id = null;
+        return ctx.scene.reenter();
+    }
 });
 
 adminScene.action('exit_admin', (ctx) => ctx.scene.leave());

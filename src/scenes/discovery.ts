@@ -37,6 +37,8 @@ async function showNextProfile(ctx: Scenes.SceneContext) {
     const skippedIds = (ctx.session as any).skippedIds || [];
     const excludeList = [...swipedList, ...skippedIds];
 
+    const filters = (ctx.session as any).filters || {};
+
     let query = supabase
         .from('profiles')
         .select('*')
@@ -44,6 +46,18 @@ async function showNextProfile(ctx: Scenes.SceneContext) {
         .filter('id', 'not.in', `(${excludeList.join(',')})`)
         .eq('is_active', true)
         .eq('is_verified', true);
+
+    // Apply Filters
+    if (filters.minAge) query = query.gte('age', filters.minAge);
+    if (filters.maxAge) query = query.lte('age', filters.maxAge);
+    if (filters.location) {
+        if (filters.isAddis) {
+            query = query.eq('sub_city', filters.location);
+        } else {
+            // Case insensitive location search if possible, or exact match
+            query = query.ilike('city', `%${filters.location}%`);
+        }
+    }
 
     if (userProfile.interested_in !== 'both') {
         query = query.eq('gender', userProfile.interested_in);
@@ -65,12 +79,20 @@ async function showNextProfile(ctx: Scenes.SceneContext) {
     }
 
     const target = profiles[0];
+    await renderProfile(ctx, target);
+}
+
+async function renderProfile(ctx: Scenes.SceneContext, target: any) {
     const caption = `🔥 **${target.first_name}**, ${target.age}\n📍 ${target.sub_city || target.city}\n⛪️ ${target.religion || 'No religion specified'}\n\n"${target.bio || 'No bio yet'}"`;
 
     const buttons = [
         [
             Markup.button.callback('❌ Pass', `swipe_dislike_${target.id}`),
             Markup.button.callback('❤️ Like', `swipe_like_${target.id}`)
+        ],
+        [
+            Markup.button.callback('⚙️ Filters', 'open_filters'),
+            Markup.button.callback('↩️ Undo', 'undo_swipe')
         ]
     ];
 
@@ -80,7 +102,6 @@ async function showNextProfile(ctx: Scenes.SceneContext) {
     }
     extraButtons.push(Markup.button.callback('Next ⏭️', `next_profile_${target.id}`));
 
-    // Add extra buttons row if any
     if (extraButtons.length > 0) {
         buttons.push(extraButtons);
     }
@@ -88,26 +109,20 @@ async function showNextProfile(ctx: Scenes.SceneContext) {
     buttons.push([Markup.button.callback('🚩 Report User', `report_user_${target.id}`)]);
 
     try {
-        console.log(`[Discovery] Attempting to send photo for ${target.first_name} (${target.id})`);
         await ctx.replyWithPhoto(target.photo_urls[0], {
             caption,
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard(buttons)
         });
-        console.log(`[Discovery] Photo sent successfully.`);
     } catch (e) {
-        console.error(`[Discovery] Failed to send photo for ${target.id}. Error:`, e);
+        console.error(`[Discovery] Failed to send photo for ${target.id}`, e);
         try {
-            await ctx.reply(`🔥 **${target.first_name}**, ${target.age} (Photo missing)\n📍 ${target.sub_city || target.city}\n\n"${target.bio || 'No bio'}"`, {
+            await ctx.reply(`🔥 **${target.first_name}**, ${target.age} (Photo missing)\n\n"${target.bio || 'No bio'}"`, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard(buttons)
             });
         } catch (innerError) {
-            console.error("[Discovery] Fallback message also failed!", innerError);
-            // Last resort: simple text without markdown
-            await ctx.reply(`🔥 ${target.first_name}, ${target.age} (Photo missing)\n"${target.bio || 'No bio'}"` + "\n\n(Note: Some profile details could not be displayed due to formatting errors.)",
-                Markup.inlineKeyboard(buttons)
-            );
+            await ctx.reply(`🔥 ${target.first_name}, ${target.age}\n"${target.bio}"`, Markup.inlineKeyboard(buttons));
         }
     }
 }
@@ -216,6 +231,53 @@ discoveryScene.action(/swipe_(like|dislike)_(.+)/, async (ctx) => {
     await ctx.answerCbQuery();
     await ctx.deleteMessage();
     return showNextProfile(ctx);
+});
+
+// Handle Filters
+discoveryScene.action('open_filters', (ctx) => ctx.scene.enter('FILTERS_SCENE'));
+
+// Handle Undo
+discoveryScene.action('undo_swipe', async (ctx) => {
+    const userId = ctx.from?.id;
+
+    // 1. Get the very last swipe action by this user
+    const { data: lastSwipe } = await supabase
+        .from('swipes')
+        .select('*')
+        .eq('swiper_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+    if (!lastSwipe) {
+        await ctx.answerCbQuery("Nothing to undo! 🤷‍♂️", { show_alert: true });
+        return;
+    }
+
+    // 2. Delete the swipe
+    await supabase.from('swipes').delete().eq('id', lastSwipe.id);
+
+    // 3. If it was a match, delete the match too
+    if (lastSwipe.type === 'like') {
+        await supabase.from('matches').delete()
+            .or(`and(user1_id.eq.${userId},user2_id.eq.${lastSwipe.swiped_id}),and(user1_id.eq.${lastSwipe.swiped_id},user2_id.eq.${userId})`);
+    }
+
+    // 4. Fetch the profile of the user we just 'un-swiped'
+    const { data: previousProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', lastSwipe.swiped_id)
+        .single();
+
+    if (previousProfile) {
+        await ctx.answerCbQuery("Rewinding... 🔄");
+        try { await ctx.deleteMessage(); } catch (e) { }
+        return renderProfile(ctx, previousProfile);
+    } else {
+        await ctx.answerCbQuery("Could not restore profile. fetching new one.");
+        return showNextProfile(ctx);
+    }
 });
 
 // Handle Icebreakers moved to index.ts for global availability

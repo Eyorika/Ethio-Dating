@@ -18,6 +18,7 @@ import { editBioWizard, editPhotosWizard, editInterestWizard, editLocationWizard
 import { likersScene } from './scenes/likers.js';
 import { matchesScene } from './scenes/matches.js';
 import { zodiacDiscoveryScene } from './scenes/zodiacDiscovery.js';
+import { filtersScene } from './scenes/filters.js';
 
 const bot = new Telegraf<Scenes.SceneContext>(token);
 
@@ -36,9 +37,10 @@ const stage = new Scenes.Stage<Scenes.SceneContext>([
     editAgeWizard as any,
     editLanguageWizard as any,
     editVoiceWizard as any,
-    likersScene as any,
     matchesScene as any,
-    zodiacDiscoveryScene as any
+    zodiacDiscoveryScene as any,
+    verificationScene as any,
+    filtersScene as any
 ]);
 
 bot.use(session());
@@ -264,6 +266,10 @@ bot.action(/ice_send_(.+)_(.+)/, async (ctx) => {
         console.error("Callback query failed (likely timeout):", e);
     }
 });
+
+import { verificationScene } from './scenes/verification.js';
+
+bot.action('try_again_verification', (ctx) => ctx.scene.enter('VERIFICATION_SCENE'));
 
 bot.action(/report_user_(.+)/, async (ctx) => {
     const targetId = ctx.match[1] as string;
