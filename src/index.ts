@@ -43,7 +43,11 @@ const stage = new Scenes.Stage<Scenes.SceneContext>([
 bot.use(session());
 
 // Force Join Channel Middleware
+// Force Join Channel Middleware
 bot.use(async (ctx, next) => {
+    // Ignore my_chat_member updates (e.g. user blocking bot)
+    if ('my_chat_member' in ctx.update) return next();
+
     const userId = ctx.from?.id;
     if (!userId) return next();
 
@@ -87,7 +91,10 @@ bot.use(async (ctx, next) => {
             }
             return; // Block execution
         }
-    } catch (e) {
+    } catch (e: any) {
+        // Ignore "blocked by user" error
+        if (e?.description?.includes('blocked by the user')) return;
+
         console.error('Force join check failed:', e);
         return next(); // Fail open if API error
     }
