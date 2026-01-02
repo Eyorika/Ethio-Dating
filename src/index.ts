@@ -20,6 +20,7 @@ import { matchesScene } from './scenes/matches.js';
 import { zodiacDiscoveryScene } from './scenes/zodiacDiscovery.js';
 import { filtersScene } from './scenes/filters.js';
 import { verificationScene } from './scenes/verification.js';
+import { chatScene } from './scenes/chat.js';
 
 const bot = new Telegraf<Scenes.SceneContext>(token);
 
@@ -41,7 +42,9 @@ const stage = new Scenes.Stage<Scenes.SceneContext>([
     matchesScene as any,
     zodiacDiscoveryScene as any,
     verificationScene as any,
-    filtersScene as any
+    filtersScene as any,
+    chatScene as any,
+    likersScene as any
 ]);
 
 bot.use(session());
@@ -55,7 +58,9 @@ bot.use(async (ctx, next) => {
     const userId = ctx.from?.id;
     if (!userId) return next();
 
-    const CHANNEL_ID = '-1003547990031';
+    // Use username for public channels (easier than ID)
+    const CHANNEL_USERNAME = '@ethio_flirt';
+    const CHANNEL_ID = CHANNEL_USERNAME;
     const CHANNEL_LINK = 'https://t.me/ethio_flirt';
 
     try {
@@ -114,31 +119,59 @@ bot.start(async (ctx) => {
     }
 
     const userId = ctx.from?.id;
-    const { data: profile } = await supabase.from('profiles').select('language').eq('id', userId).single();
-    const lang = profile?.language || 'en';
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
 
-    ctx.replyWithMarkdown(t(lang, 'WELCOME'), {
-        reply_markup: {
-            keyboard: lang === 'am' ? [
-                [{ text: '🚀 ፍለጋ (Discovery)' }, { text: '🌟 ኮከብ ተኳሽ' }],
-                [{ text: '👤 ፕሮፋይሌ' }, { text: '💬 የኔ ተዛማጆች' }]
-            ] : [
-                [{ text: '🚀 Discovery' }, { text: '🌟 Zodiac Match' }],
-                [{ text: '👤 My Profile' }, { text: '💬 My Matches' }]
-            ],
-            resize_keyboard: true
-        }
-    });
+    // If user already has a profile, show main menu
+    if (profile && profile.is_verified) {
+        const lang = profile.language || 'en';
+        const greeting = lang === 'am'
+            ? `ሰላም ${profile.first_name}! 👋\n\nምን ማድረግ ትፈልጋለህ/ሽ?`
+            : `Hey ${profile.first_name}! 👋\n\nWhat would you like to do?`;
+
+        ctx.reply(greeting, {
+            reply_markup: {
+                keyboard: lang === 'am' ? [
+                    [{ text: '🚀 ፍለጋ (Discovery)' }, { text: '🌟 ኮከብ ጥምረት' }],
+                    [{ text: '👤 ፕሮፋይሌ' }, { text: '💬 የኔ ተዛማጆች' }]
+                ] : [
+                    [{ text: '🚀 Discovery' }, { text: '🌟 Zodiac Match' }],
+                    [{ text: '👤 My Profile' }, { text: '💬 My Matches' }]
+                ],
+                resize_keyboard: true
+            }
+        });
+    } else {
+        // New user - show welcome with registration button
+        const welcomeMsg = `👋 Welcome to **Tebesa**!\n\nI'm here to help you find meaningful connections in Ethiopia.\n\n📝 **What I'll ask you:**\n• Your name\n• Age (18+)\n• Gender & who you want to meet\n• Location\n• Religion\n• Zodiac sign\n• Photos (1-3)\n• Bio (optional)\n\n⏱️ Takes about 2 minutes`;
+
+        await ctx.replyWithMarkdown(welcomeMsg, Markup.inlineKeyboard([
+            [Markup.button.callback('🚀 Start Registration', 'start_registration')],
+            [Markup.button.callback('🇪🇹 ለመመዝገብ', 'start_registration_am')]
+        ]));
+    }
 });
 
 bot.hears(['🚀 Discovery', '🚀 ፍለጋ (Discovery)'], (ctx) => ctx.scene.enter('DISCOVERY_SCENE'));
-bot.hears(['🌟 Zodiac Match', '🌟 ኮከብ ተኳሽ', '🌟 ከክብ ተኳሽ', '🌟 ከከብ ተኳሽ'], (ctx) => ctx.scene.enter('ZODIAC_DISCOVERY_SCENE'));
+bot.hears(['🌟 Zodiac Match', '🌟 ኮከብ ጥምረት', '🌟 ከክብ ጥምረት', '🌟 ከከብ ጥምረት'], (ctx) => ctx.scene.enter('ZODIAC_DISCOVERY_SCENE'));
 bot.hears(['👤 My Profile', '👤 ፕሮፋይሌ'], (ctx) => ctx.scene.enter('PROFILE_SCENE'));
 bot.hears(['💬 My Matches', '💬 የኔ ተዛማጆች'], (ctx) => ctx.scene.enter('MATCHES_SCENE'));
 bot.command('register', (ctx) => ctx.scene.enter('REGISTRATION_SCENE'));
 bot.command('discovery', (ctx) => ctx.scene.enter('DISCOVERY_SCENE'));
 bot.command('profile', (ctx) => ctx.scene.enter('PROFILE_SCENE'));
 bot.command('admin', (ctx) => ctx.scene.enter('ADMIN_SCENE'));
+
+// Registration button handlers
+bot.action('start_registration', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.deleteMessage();
+    return ctx.scene.enter('REGISTRATION_SCENE');
+});
+
+bot.action('start_registration_am', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.deleteMessage();
+    return ctx.scene.enter('REGISTRATION_SCENE');
+});
 
 // Global Action Handlers
 
@@ -284,6 +317,12 @@ bot.action(/ice_send_(.+)_(.+)/, async (ctx) => {
 
 
 bot.action('try_again_verification', (ctx) => ctx.scene.enter('VERIFICATION_SCENE'));
+
+bot.action(/chat_with_(.+)/, (ctx) => {
+    const targetUserId = ctx.match?.[1];
+    if (!targetUserId) return ctx.answerCbQuery("Invalid user.");
+    return ctx.scene.enter('CHAT_SCENE', { targetUserId });
+});
 
 bot.action(/report_user_(.+)/, async (ctx) => {
     const targetId = ctx.match[1] as string;

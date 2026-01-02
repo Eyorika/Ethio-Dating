@@ -57,28 +57,38 @@ async function showNextLiker(ctx: Scenes.SceneContext) {
     if (!target) return showNextLiker(ctx);
 
     const caption = lang === 'am'
-        ? `❤️ **${target.first_name} ወዶሃል/ሻል!**\n\n` +
-        `**እድሜ:** ${target.age}\n` +
-        `**አድራሻ:** ${target.sub_city || target.city}\n` +
-        `**ባዮ:** ${target.bio || 'የለም'}\n\n` +
+        ? `❤️ <b>${target.first_name} ወዶሃል/ሻል!</b>\n\n` +
+        `<b>እድሜ:</b> ${target.age}\n` +
+        `<b>አድራሻ:</b> ${target.sub_city || target.city}\n` +
+        `<b>ባዮ:</b> ${target.bio || 'የለም'}\n\n` +
         `ተዛማጅ መሆን ትፈልጋለህ/ሽ?`
-        : `❤️ **${target.first_name} liked you!**\n\n` +
-        `**Age:** ${target.age}\n` +
-        `**Location:** ${target.sub_city || target.city}\n` +
-        `**Bio:** ${target.bio || 'No bio'}\n\n` +
+        : `❤️ <b>${target.first_name} liked you!</b>\n\n` +
+        `<b>Age:</b> ${target.age}\n` +
+        `<b>Location:</b> ${target.sub_city || target.city}\n` +
+        `<b>Bio:</b> ${target.bio || 'No bio'}\n\n` +
         `Do you want to match back?`;
 
-    await ctx.replyWithPhoto(target.photo_urls[0], {
-        caption,
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [
-                Markup.button.callback(lang === 'am' ? '❌ እለፈው' : '❌ Pass', `liker_dislike_${target.id}`),
-                Markup.button.callback(lang === 'am' ? '❤️ ላይክ መልስ!' : '❤️ Like Back!', `liker_like_${target.id}`)
-            ],
-            [Markup.button.callback(lang === 'am' ? '⬅️ ወደ ፕሮፋይል ተመለስ' : '⬅️ Back to Profile', 'back_to_profile')]
-        ])
-    });
+    const buttons = [
+        [
+            Markup.button.callback(lang === 'am' ? '❌ እለፈው' : '❌ Pass', `liker_dislike_${target.id}`),
+            Markup.button.callback(lang === 'am' ? '❤️ ላይክ መልስ!' : '❤️ Like Back!', `liker_like_${target.id}`)
+        ],
+        [Markup.button.callback(lang === 'am' ? '⬅️ ወደ ፕሮፋይል ተመለስ' : '⬅️ Back to Profile', 'back_to_profile')]
+    ];
+
+    try {
+        await ctx.replyWithPhoto(target.photo_urls?.[0], {
+            caption,
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard(buttons)
+        });
+    } catch (e) {
+        console.error("Liker photo failed to send:", e);
+        await ctx.reply(caption, {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard(buttons)
+        });
+    }
 }
 
 likersScene.action(/liker_(like|dislike)_(.+)/, async (ctx) => {

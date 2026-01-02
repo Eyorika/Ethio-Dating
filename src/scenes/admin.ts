@@ -246,7 +246,7 @@ adminScene.on('text', async (ctx) => {
     // Allow main menu buttons to work even from here
     const menuButtons = [
         '🚀 Discovery', '🚀 ፍለጋ (Discovery)',
-        '🌟 Zodiac Match', '🌟 ኮከብ ተኳሽ', '🌟 ከክብ ተኳሽ', '🌟 ከከብ ተኳሽ',
+        '🌟 Zodiac Match', '🌟 ኮከብ ጥምረት', '🌟 ከክብ ጥምረት', '🌟 ከከብ ጥምረት',
         '👤 My Profile', '👤 ፕሮፋይሌ',
         '💬 My Matches', '💬 የኔ ተዛማጆች'
     ];

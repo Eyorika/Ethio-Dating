@@ -2,8 +2,8 @@
 
 export const PROMPTS = {
     WELCOME: {
-        en: `Selam Arada! 👋 I’m **Tebesa**, your digital wingman. I’m not here to just show you photos; I’m here to find your *vibe-mate*.\n\nWhether you’re a **Bole** 'Burger' lover or a **Piassa** 'Macchiato' enthusiast, I’ve got someone for you. ዝግጁ ነህ/ነሽ? (Are you ready?) Let’s get you set up!`,
-        am: `ሰላም አራዳ! 👋 እኔ **ጠበሳ** ነኝ፤ ያንተ/ያንቺ ዲጂታል አገናኝ። እዚህ የመጣሁት ፎቶዎች ለማሳየት ብቻ ሳይሆን ላንተ/ላንቺ *የሚመጥን* ሰው ለማግኘት ነው።\n\nከቦሌ 'በርገር' አፍቃሪ እስከ ፒያሳ 'ማኪያቶ' ወዳድ፤ ለሁሉም የሚሆን ሰው አለኝ። ዝግጁ ነህ/ነሽ? እንጀምር!`
+        en: `👋 Welcome to ** Tebesa ** !\n\nI'm here to help you find meaningful connections in Ethiopia. Let's create your profile together!\n\n📝 ** What I'll ask you:**\n• Your name\n• Age (18+)\n• Gender & who you want to meet\n• Location\n• Religion\n• Zodiac sign\n• Photos (1-3)\n• Bio (optional)\n\n⏱️ Takes about 2 minutes\n\n**Let's start! What's your first name?**`,
+        am: `👋 ወደ **ጠበሳ** እንኳን በደህና መጡ!\n\nትርጉም ያለው ግንኙነት እንዲያገኙ ለመርዳት እዚህ ነኝ። የእርስዎን መገለጫ አንድ ላይ እንፍጠር!\n\n📝 **የምጠይቅዎት:**\n• ስምዎ\n• እድሜ (18+)\n• ጾታ እና ማንን ማግኘት እንደሚፈልጉ\n• አድራሻ\n• ሃይማኖት\n• የኮከብ ምልክት\n• ፎቶዎች (1-3)\n• ስለራስዎ (አማራጭ)\n\n⏱️ በግምት 2 ደቂቃ ይወስዳል\n\n**እንጀምር! የመጀመሪያ ስምዎ ምንድን ነው?**`
     },
 
     REGISTRATION: {

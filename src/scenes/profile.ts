@@ -165,7 +165,7 @@ profileScene.action('back_to_menu', async (ctx) => {
     await ctx.replyWithMarkdown(t(lang, 'WELCOME'), {
         reply_markup: {
             keyboard: lang === 'am' ? [
-                [{ text: '🚀 ፍለጋ (Discovery)' }, { text: '🌟 ኮከብ ተኳሽ' }],
+                [{ text: '🚀 ፍለጋ (Discovery)' }, { text: '🌟 ኮከብ ጥምረት' }],
                 [{ text: '👤 ፕሮፋይሌ' }, { text: '💬 የኔ ተዛማጆች' }]
             ] : [
                 [{ text: '🚀 Discovery' }, { text: '🌟 Zodiac Match' }],

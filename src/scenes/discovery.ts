@@ -7,7 +7,11 @@ export const discoveryScene = new Scenes.BaseScene<Scenes.SceneContext>('DISCOVE
 discoveryScene.enter(async (ctx) => {
     const { data: profile } = await supabase.from('profiles').select('language').eq('id', ctx.from?.id).single();
     const lang = profile?.language || 'en';
-    await ctx.reply(lang === 'am' ? "ተዛማጅ በመፈለግ ላይ... 🔍" : "Searching for your vibe-mate... 🔍");
+    await ctx.reply(lang === 'am'
+        ? "🔍 **ተዛማጅ በመፈለግ ላይ...**\n\nከእርስዎ ምርጫዎች ጋር የሚስማሙ ሰዎችን እያሰስኩ ነው..."
+        : "🔍 **Scanning for matches...**\n\nLooking for people who match your vibe...",
+        { parse_mode: 'Markdown' }
+    );
     return showNextProfile(ctx);
 });
 
@@ -93,8 +97,8 @@ async function renderProfile(ctx: Scenes.SceneContext, target: any) {
     const lang = myProfile?.language || 'en';
 
     const caption = lang === 'am'
-        ? `🔥 **${target.first_name}**, ${target.age}\n📍 ${target.sub_city || target.city}\n⛪️ ${target.religion || 'አልተጠቀሰም'}\n\n"${target.bio || 'ባዮ የለም'}"`
-        : `🔥 **${target.first_name}**, ${target.age}\n📍 ${target.sub_city || target.city}\n⛪️ ${target.religion || 'No religion specified'}\n\n"${target.bio || 'No bio yet'}"`;
+        ? `✨ <b>${target.first_name}</b>, ${target.age}\n\n📍 ${target.sub_city || target.city}\n⛪️ ${target.religion || 'አልተጠቀሰም'}\n\n<i>"${target.bio || 'ባዮ የለም'}"</i>\n\n━━━━━━━━━━━━━━━`
+        : `✨ <b>${target.first_name}</b>, ${target.age}\n\n📍 ${target.sub_city || target.city}\n⛪️ ${target.religion || 'No religion specified'}\n\n<i>"${target.bio || 'No bio yet'}"</i>\n\n━━━━━━━━━━━━━━━`;
 
     const buttons = [
         [
@@ -120,16 +124,16 @@ async function renderProfile(ctx: Scenes.SceneContext, target: any) {
     buttons.push([Markup.button.callback(lang === 'am' ? '🚩 ሪፖርት' : '🚩 Report User', `report_user_${target.id}`)]);
 
     try {
-        await ctx.replyWithPhoto(target.photo_urls[0], {
+        await ctx.replyWithPhoto(target.photo_urls?.[0], {
             caption,
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             ...Markup.inlineKeyboard(buttons)
         });
     } catch (e) {
         console.error(`[Discovery] Failed to send photo for ${target.id}`, e);
         try {
-            await ctx.reply(`🔥 **${target.first_name}**, ${target.age} (Photo missing)\n\n"${target.bio || 'No bio'}"`, {
-                parse_mode: 'Markdown',
+            await ctx.reply(`🔥 <b>${target.first_name}</b>, ${target.age} (Photo missing)\n\n"${target.bio || 'No bio'}"`, {
+                parse_mode: 'HTML',
                 ...Markup.inlineKeyboard(buttons)
             });
         } catch (innerError) {

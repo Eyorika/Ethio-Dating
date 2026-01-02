@@ -2,6 +2,17 @@ import { Scenes, Markup } from 'telegraf';
 import { PROMPTS, KIFLE_KETEMAS, RELIGIONS, ZODIACS, t } from '../content/prompts.js';
 import { supabase } from '../services/supabase.js';
 
+// Helper function to create progress indicator
+function getProgressBar(step: number, total: number, lang: string): string {
+    const percentage = Math.round((step / total) * 100);
+    const filled = Math.round((step / total) * 10);
+    const empty = 10 - filled;
+    const bar = '▓'.repeat(filled) + '░'.repeat(empty);
+
+    const stepText = lang === 'am' ? `ደረጃ ${step}/${total}` : `Step ${step}/${total}`;
+    return `${stepText} 📝\n${bar} ${percentage}%\n━━━━━━━━━━━━━━━`;
+}
+
 export const registrationWizard = new Scenes.WizardScene(
     'REGISTRATION_SCENE',
     // Step 0: Language Selection
@@ -22,37 +33,48 @@ export const registrationWizard = new Scenes.WizardScene(
         const lang = (ctx.message as any).text;
         (ctx.wizard.state as any).language = lang === 'አማርኛ 🇪🇹' ? 'am' : 'en';
 
-        const prompt = t((ctx.wizard.state as any).language, 'WELCOME');
+        const progress = getProgressBar(1, 9, (ctx.wizard.state as any).language);
+        const prompt = (ctx.wizard.state as any).language === 'am'
+            ? '📝 የመጀመሪያ ስምዎ ምንድን ነው?'
+            : '📝 What\'s your first name?';
 
-        await ctx.reply(prompt);
+        await ctx.reply(`${progress}\n\n${prompt}`);
         return ctx.wizard.next();
     },
     // Step 2: Ask for Age
     async (ctx) => {
         const name = (ctx.message as any).text;
         (ctx.wizard.state as any).name = name;
+        const lang = (ctx.wizard.state as any).language;
 
-        const prompt = (ctx.wizard.state as any).language === 'am'
-            ? `ተረድቻለሁ ${name}! እድሜህ/ሽ ስንት ነው?`
-            : `Got it, ${name}! How old are you?`;
+        const progress = getProgressBar(2, 9, lang);
+        const prompt = lang === 'am'
+            ? `✨ ተረድቻለሁ ${name}!\n\n🎂 እድሜህ/ሽ ስንት ነው?\n\n<i>ምሳሌ: 25</i>`
+            : `✨ Got it, ${name}!\n\n🎂 How old are you?\n\n<i>Example: 25</i>`;
 
-        await ctx.reply(prompt);
+        await ctx.reply(`${progress}\n\n${prompt}`, { parse_mode: 'HTML' });
         return ctx.wizard.next();
     },
     // Step 3: Gender
     async (ctx) => {
         const age = parseInt((ctx.message as any).text);
-        if (isNaN(age)) {
-            const prompt = (ctx.wizard.state as any).language === 'am' ? "እባክህ/ሽ ትክክለኛ የቁጥር አመልካች ተጠቀም።" : "Oops! Please enter a valid number for age.";
+        const lang = (ctx.wizard.state as any).language;
+
+        if (isNaN(age) || age < 18 || age > 100) {
+            const prompt = lang === 'am'
+                ? "⚠️ እባክህ/ሽ ትክክለኛ እድሜ አስገባ (18-100)\n\nምሳሌ: 25"
+                : "⚠️ Please enter a valid age (18-100)\n\nExample: 25";
             await ctx.reply(prompt);
             return;
         }
         (ctx.wizard.state as any).age = age;
 
-        const genderPrompt = (ctx.wizard.state as any).language === 'am' ? "ጾታህ/ሽ? (ወንድ/ሴት)" : "And your gender? (male/female)";
-        await ctx.reply(genderPrompt, {
+        const progress = getProgressBar(3, 9, lang);
+        const genderPrompt = lang === 'am' ? "👤 ጾታህ/ሽ?" : "👤 What's your gender?";
+
+        await ctx.reply(`${progress}\n\n${genderPrompt}`, {
             reply_markup: {
-                keyboard: (ctx.wizard.state as any).language === 'am'
+                keyboard: lang === 'am'
                     ? [[{ text: 'ወንድ' }, { text: 'ሴት' }]]
                     : [[{ text: 'male' }, { text: 'female' }]],
                 one_time_keyboard: true,
@@ -86,9 +108,11 @@ export const registrationWizard = new Scenes.WizardScene(
         if (interestText === 'ሴቶች' || interestText === 'female') interest = 'female';
         (ctx.wizard.state as any).interested_in = interest;
 
-        const locPrompt = t((ctx.wizard.state as any).language, 'REGISTRATION.LOCATION');
+        const lang = (ctx.wizard.state as any).language;
+        const progress = getProgressBar(5, 9, lang);
+        const locPrompt = t(lang, 'REGISTRATION.LOCATION');
 
-        await ctx.reply(locPrompt, {
+        await ctx.reply(`${progress}\n\n📍 ${locPrompt}`, {
             reply_markup: {
                 keyboard: (ctx.wizard.state as any).language === 'am'
                     ? [[{ text: 'አዲስ አበባ' }], [{ text: 'ከአዲስ አበባ ውጭ' }]]
@@ -158,13 +182,17 @@ export const registrationWizard = new Scenes.WizardScene(
         (ctx.wizard.state as any).zodiac = foundZodiac?.name || 'Aries';
 
         const lang = (ctx.wizard.state as any).language;
+        const progress = getProgressBar(9, 9, lang);
         const prompt = lang === 'am'
-            ? "አሁን የአራዳ ስታይልህን/ሽን አሳየን! 😎 እስከ 3 ፎቶዎችን (አንድ በአንድ) ላክልኝ። \n\nጨርሰህ/ሽ ከሆነ '✅ ጨርሻለሁ' የሚለውን ንካ።"
-            : "Now, show off your Arada style! 😎 Send me up to 3 photos (one by one). \n\nClick '✅ Done' when you're finished.";
+            ? "📸 አሁን የአራዳ ስታይልህን/ሽን አሳየን! 😎 \n\nእስከ 3 ፎቶዎችን (አንድ በአንድ) ላክልኝ።\n\n<i>ምስሌ: የመገለጽ ፎቶችን ተጠቀም</i>\n\nችረሴህ/ሽ ከሆነ '✅ ችርሻለሁ' የሚለውን ንካ።"
+            : "📸 Now, show off your Arada style! 😎\n\nSend me up to 3 photos (one by one).\n\n<i>Tip: Use clear, recent photos</i>\n\nClick '✅ Done' when you're finished.";
 
-        await ctx.reply(prompt, Markup.keyboard([
-            [lang === 'am' ? '✅ ጨርሻለሁ' : '✅ Done']
-        ]).resize());
+        await ctx.reply(`${progress}\n\n${prompt}`, {
+            parse_mode: 'HTML',
+            ...Markup.keyboard([
+                [lang === 'am' ? '✅ ጨርሻለሁ' : '✅ Done']
+            ]).resize()
+        });
 
         return ctx.wizard.next();
     },

@@ -32,8 +32,8 @@ zodiacDiscoveryScene.enter(async (ctx) => {
     const zodiacData = ZODIACS.find(z => z.name === userProfile.zodiac);
 
     await ctx.reply(lang === 'am'
-        ? `🌟 **የኮከብ ተኳሽ ዝግጁ ነው!** 🌟\n\nአንተ/ቺ **${zodiacData?.icon} ${zodiacData?.am}** ነህ/ሽ። ለኮከብህ/ሽ የሚመጥኑትን በመፈለግ ላይ፦ ${compatibleZodiacs.join(', ')}...`
-        : `🌟 **Zodiac Mode Active!** 🌟\n\nYou are a **${zodiacData?.icon} ${userProfile.zodiac}**. I'm looking for your most compatible stars: ${compatibleZodiacs.join(', ')}...`,
+        ? `🔮 **የኮከብ ጥምረት**\n\nአንተ/ቺ **${zodiacData?.icon} ${zodiacData?.am}** ነህ/ሽ።\n\n✨ **ተስማሚ ኮከቦች:** ${compatibleZodiacs.join(', ')}\n\n🔍 ከለዋክብት ጋር ንግግር እጀመሩ ነው...`
+        : `🔮 **Zodiac Match Mode**\n\nYou are a **${zodiacData?.icon} ${userProfile.zodiac}**.\n\n✨ **Compatible Matches:** ${compatibleZodiacs.join(', ')}\n\n🔍 Aligning the stars for you...`,
         { parse_mode: 'Markdown' });
 
     return showNextZodiacProfile(ctx, userProfile, compatibleZodiacs);
@@ -97,18 +97,8 @@ async function renderZodiacProfile(ctx: Scenes.SceneContext, target: any, userPr
     const targetZodiac = ZODIACS.find(z => z.name === target.zodiac);
 
     const caption = lang === 'am'
-        ? `⭐ **የኮከብ ተዛማጅ!** ⭐\n\n` +
-        `**${target.first_name}** (${target.age})\n` +
-        `**ኮከብ:** ${targetZodiac?.icon} ${targetZodiac?.am}\n` +
-        `**አድራሻ:** ${target.sub_city || target.city}\n` +
-        `**ባዮ:** ${target.bio || 'የለም'}\n\n` +
-        `ከዋክብት እንደሚመጥኑላችሁ ይናገራሉ! ❤️`
-        : `⭐ **Zodiac Match!** ⭐\n\n` +
-        `**${target.first_name}** (${target.age})\n` +
-        `**Zodiac:** ${targetZodiac?.icon} ${target.zodiac}\n` +
-        `**Location:** ${target.sub_city || target.city}\n` +
-        `**Bio:** ${target.bio || 'No bio'}\n\n` +
-        `The stars say you're a great match! ❤️`;
+        ? `⭐ <b>የኮከብ ተዛማጅ!</b> ⭐\n\n✨ <b>${target.first_name}</b>, ${target.age}\n📍 ${target.sub_city || target.city}\n⚛️ ${targetZodiac?.icon} ${targetZodiac?.am}\n\n<i>"${target.bio || ''}"</i>\n\n━━━━━━━━━━━━━━━`
+        : `⭐ <b>Celestial Match!</b> ⭐\n\n✨ <b>${target.first_name}</b>, ${target.age}\n📍 ${target.sub_city || target.city}\n⚛️ ${targetZodiac?.icon} ${targetZodiac?.name}\n\n<i>"${target.bio || ''}"</i>\n\n━━━━━━━━━━━━━━━`;
 
     const buttons = [
         [
@@ -116,8 +106,7 @@ async function renderZodiacProfile(ctx: Scenes.SceneContext, target: any, userPr
             Markup.button.callback(lang === 'am' ? '❤️ ላይክ!' : '❤️ Like!', `zodiac_like_${target.id}`)
         ],
         [
-            Markup.button.callback(lang === 'am' ? '↩️ ተመለስ' : '↩️ Undo', 'undo_zodiac_swipe'),
-            Markup.button.callback(lang === 'am' ? '🏠 ዝርዝር' : '🏠 Menu', 'back_to_menu')
+            Markup.button.callback(lang === 'am' ? '↩️ ተመለስ' : '↩️ Undo', 'undo_zodiac_swipe')
         ]
     ];
 
@@ -132,15 +121,15 @@ async function renderZodiacProfile(ctx: Scenes.SceneContext, target: any, userPr
     }
 
     try {
-        await ctx.replyWithPhoto(target.photo_urls[0], {
+        await ctx.replyWithPhoto(target.photo_urls?.[0], {
             caption,
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             ...Markup.inlineKeyboard(buttons)
         });
     } catch (e) {
         console.error("Zodiac photo failed to send:", e);
         await ctx.reply(caption, {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             ...Markup.inlineKeyboard(buttons)
         });
     }
@@ -290,21 +279,4 @@ zodiacDiscoveryScene.action('undo_zodiac_swipe', async (ctx) => {
     }
 });
 
-zodiacDiscoveryScene.action('back_to_menu', async (ctx) => {
-    const { data: profile } = await supabase.from('profiles').select('language').eq('id', ctx.from?.id).single();
-    const lang = profile?.language || 'en';
 
-    await ctx.scene.leave();
-    await ctx.replyWithMarkdown(t(lang, 'WELCOME'), {
-        reply_markup: {
-            keyboard: lang === 'am' ? [
-                [{ text: '🚀 ፍለጋ (Discovery)' }, { text: '🌟 ኮከብ ተኳሽ' }],
-                [{ text: '👤 ፕሮፋይሌ' }, { text: '💬 የኔ ተዛማጆች' }]
-            ] : [
-                [{ text: '🚀 Discovery' }, { text: '🌟 Zodiac Match' }],
-                [{ text: '👤 My Profile' }, { text: '💬 My Matches' }]
-            ],
-            resize_keyboard: true
-        }
-    });
-});
